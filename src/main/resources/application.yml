@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mindbridge
+
+# ===== MindBridge 自定义配置 =====
+mindbridge:
+  ai:
+    # 当前启用的 AI 提供方: ollama | openai
+    provider: ollama
+    ollama:
+      base-url: http://localhost:11434
+      # 简历中的微调模型: mindbridge-qwen2.5-7b-ft:latest
+      # 先用基座模型联通，待 ollama pull 后可切换
+      model: qwen2.5:3b
+      # 单次请求超时(秒)
+      timeout-seconds: 120
+
+logging:
+  level:
+    com.mindbridge: DEBUG
