@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindBridge 管理后台</title>
+    <style>
+        :root{
+            --primary:#6366f1; --primary-2:#8b5cf6; --accent:#f472b6;
+            --ink:#1e1b3a; --muted:#6b7280; --line:rgba(99,102,241,.14);
+            --glass:rgba(255,255,255,.72); --glass-strong:rgba(255,255,255,.88);
+        }
+        *{ box-sizing:border-box; }
+        html,body{ height:100%; margin:0; }
+        body{
+            font-family:"Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+            color:var(--ink); background:#f6f5ff; position:relative; overflow:hidden;
+        }
+        body::before{
+            content:""; position:fixed; inset:-20% -10% auto -10%; height:120%; z-index:0;
+            background:
+                radial-gradient(40% 50% at 12% 18%, rgba(139,92,246,.24), transparent 60%),
+                radial-gradient(38% 48% at 88% 14%, rgba(96,165,250,.22), transparent 60%),
+                radial-gradient(45% 55% at 82% 86%, rgba(244,114,182,.16), transparent 60%);
+            filter:blur(8px); pointer-events:none;
+        }
+        svg{ width:1em; height:1em; display:block; }
+        .ic{ display:inline-flex; }
+        .shell{ position:relative; z-index:1; display:flex; height:100vh; padding:14px; gap:14px; }
+
+        /* 侧边栏 */
+        .sidebar{ width:230px; flex-shrink:0; display:flex; flex-direction:column;
+            background:var(--glass-strong); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+            border:1px solid rgba(255,255,255,.6); border-radius:20px; padding:20px 14px;
+            box-shadow:0 12px 40px -16px rgba(80,70,180,.3); }
+        .side-brand{ display:flex; align-items:center; gap:10px; padding:6px 8px 18px; }
+        .side-brand .logo{ width:38px; height:38px; border-radius:11px; color:#fff; font-size:20px;
+            background:linear-gradient(135deg,var(--primary),var(--primary-2)); display:flex; align-items:center; justify-content:center; }
+        .side-brand .name{ font-weight:600; font-size:15px; }
+        .side-brand .name small{ display:block; font-size:11px; color:var(--muted); font-weight:400; }
+        .nav{ display:flex; flex-direction:column; gap:4px; }
+        .nav-item{ display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:11px; cursor:pointer;
+            color:var(--muted); font-size:14px; font-weight:500; transition:.18s; }
+        .nav-item .ic{ font-size:19px; }
+        .nav-item:hover{ background:rgba(99,102,241,.07); color:var(--primary); }
+        .nav-item.active{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; box-shadow:0 8px 18px -8px rgba(99,102,241,.6); }
+        .nav-item .soon{ margin-left:auto; font-size:10px; background:rgba(139,92,246,.14); color:var(--primary); padding:1px 7px; border-radius:8px; }
+        .nav-item.active .soon{ background:rgba(255,255,255,.25); color:#fff; }
+        .side-foot{ margin-top:auto; }
+        .logout{ display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:11px; cursor:pointer;
+            color:var(--muted); font-size:14px; border:1px solid var(--line); background:rgba(255,255,255,.5); transition:.18s; }
+        .logout:hover{ color:#e0496a; border-color:#f3b6c4; }
+
+        /* 主区 */
+        .main{ flex:1; display:flex; flex-direction:column; gap:14px; min-width:0; }
+        .topbar{ display:flex; align-items:center; justify-content:space-between; padding:16px 22px;
+            background:var(--glass-strong); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.6);
+            border-radius:18px; box-shadow:0 6px 20px -10px rgba(80,70,180,.25); }
+        .topbar h1{ margin:0; font-size:19px; font-weight:600; }
+        .topbar .who{ display:flex; align-items:center; gap:10px; font-size:14px; color:var(--muted); }
+        .topbar .who b{ color:var(--ink); font-weight:600; }
+        .topbar .who .av{ width:34px; height:34px; border-radius:10px; color:#fff; font-size:17px;
+            background:linear-gradient(135deg,var(--primary),var(--primary-2)); display:flex; align-items:center; justify-content:center; }
+        .content{ flex:1; overflow-y:auto; padding:2px; }
+        .content::-webkit-scrollbar{ width:7px; } .content::-webkit-scrollbar-thumb{ background:rgba(99,102,241,.22); border-radius:4px; }
+
+        /* 统计卡片 */
+        .stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+        .stat{ background:var(--glass-strong); border:1px solid rgba(255,255,255,.6); border-radius:16px; padding:18px 20px;
+            box-shadow:0 6px 20px -12px rgba(80,70,180,.25); }
+        .stat .top{ display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+        .stat .top .ic{ font-size:18px; }
+        .stat .num{ font-size:30px; font-weight:600; margin-top:8px; }
+        .stat.danger .num{ color:#e0496a; } .stat.danger .top{ color:#e0496a; }
+
+        /* 卡片/表格 */
+        .panel{ background:var(--glass-strong); border:1px solid rgba(255,255,255,.6); border-radius:18px; padding:20px 22px;
+            box-shadow:0 8px 28px -16px rgba(80,70,180,.3); }
+        .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+        .panel-head h2{ margin:0; font-size:16px; font-weight:600; display:flex; align-items:center; gap:8px; }
+        .panel-head h2 .ic{ color:var(--primary); font-size:19px; }
+        .btn-ghost{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:1px solid var(--line);
+            background:rgba(255,255,255,.6); border-radius:10px; color:var(--muted); cursor:pointer; font-size:13px; font-family:inherit; }
+        .btn-ghost:hover{ border-color:var(--primary); color:var(--primary); }
+        table{ width:100%; border-collapse:collapse; font-size:14px; }
+        thead th{ text-align:left; padding:10px 12px; color:var(--muted); font-weight:500; font-size:13px;
+            border-bottom:1px solid var(--line); }
+        tbody td{ padding:12px; border-bottom:1px solid rgba(99,102,241,.07); vertical-align:top; }
+        tbody tr:hover{ background:rgba(99,102,241,.04); }
+        .badge{ display:inline-block; padding:2px 10px; border-radius:9px; font-size:12px; font-weight:600; }
+        .lv-HIGH{ background:#fde7ec; color:#c11d45; } .lv-MEDIUM{ background:#fdf0db; color:#9a6111; } .lv-LOW{ background:#e3f6ec; color:#0f7a52; }
+        .emo{ font-size:12px; color:var(--muted); }
+        .msg-cell{ max-width:280px; color:var(--ink); }
+        .empty{ text-align:center; color:var(--muted); padding:48px 0; }
+        .empty .ic{ font-size:40px; color:#c7c5e0; display:block; margin:0 auto 12px; width:40px; }
+
+        /* 知识库上传占位 */
+        .uploader{ border:2px dashed var(--line); border-radius:16px; padding:40px; text-align:center; color:var(--muted);
+            background:rgba(99,102,241,.03); cursor:pointer; transition:.18s; }
+        .uploader:hover{ border-color:var(--primary); background:rgba(99,102,241,.06); color:var(--primary); }
+        .uploader .ic{ font-size:38px; display:block; width:38px; margin:0 auto 12px; }
+        .soon-tip{ display:inline-block; margin-top:10px; font-size:12px; background:rgba(139,92,246,.12); color:var(--primary); padding:3px 10px; border-radius:9px; }
+        .hidden{ display:none; }
+        .center-msg{ display:flex; align-items:center; justify-content:center; height:60vh; color:var(--muted); flex-direction:column; gap:14px; }
+        .center-msg .ic{ font-size:48px; color:#c7c5e0; }
+        .center-msg a{ color:var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="shell" id="shell" style="display:none">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="side-brand">
+                <div class="logo"><span class="ic" data-i="shield"></span></div>
+                <div class="name">MindBridge<small>管理后台</small></div>
+            </div>
+            <nav class="nav">
+                <div class="nav-item active" data-view="alerts" onclick="switchView('alerts')">
+                    <span class="ic" data-i="alert"></span>预警台账</div>
+                <div class="nav-item" data-view="kb" onclick="switchView('kb')">
+                    <span class="ic" data-i="book"></span>知识库管理<span class="soon">即将上线</span></div>
+            </nav>
+            <div class="side-foot">
+                <div class="logout" onclick="logout()"><span class="ic" data-i="logout"></span>退出登录</div>
+            </div>
+        </aside>
+
+        <!-- 主区 -->
+        <div class="main">
+            <div class="topbar">
+                <h1 id="viewTitle">预警台账</h1>
+                <div class="who"><span>管理员</span><b id="adminName">—</b>
+                    <div class="av"><span class="ic" data-i="user"></span></div></div>
+            </div>
+            <div class="content">
+                <!-- 预警台账 -->
+                <div id="view-alerts">
+                    <div class="stats">
+                        <div class="stat"><div class="top"><span class="ic" data-i="alert"></span>累计预警</div><div class="num" id="stTotal">0</div></div>
+                        <div class="stat danger"><div class="top"><span class="ic" data-i="flame"></span>高风险</div><div class="num" id="stHigh">0</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="clock"></span>今日新增</div><div class="num" id="stToday">0</div></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="alert"></span>高风险预警记录</h2>
+                            <button class="btn-ghost" onclick="loadAlerts()"><span class="ic" data-i="refresh"></span>刷新</button>
+                        </div>
+                        <div id="alertsBody"></div>
+                    </div>
+                </div>
+
+                <!-- 知识库管理(占位框架) -->
+                <div id="view-kb" class="hidden">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="upload"></span>上传知识文档</h2>
+                        </div>
+                        <div class="uploader" onclick="kbSoon()">
+                            <span class="ic" data-i="upload"></span>
+                            点击或拖拽上传 Markdown / PDF / TXT 心理知识文档
+                            <div class="soon-tip">功能开发中 · 即将上线</div>
+                        </div>
+                    </div>
+                    <div class="panel" style="margin-top:16px">
+                        <div class="panel-head"><h2><span class="ic" data-i="book"></span>知识文档列表</h2></div>
+                        <div class="empty"><span class="ic" data-i="book"></span>知识库管理功能开发中，敬请期待<br>未来可在此查看、检索、删除已入库的文档</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 无权限/未登录提示 -->
+    <div class="center-msg" id="blocker" style="display:none">
+        <span class="ic" data-i="lock"></span>
+        <div id="blockerMsg">需要管理员权限</div>
+        <a href="/index.html">返回登录</a>
+    </div>
+
+    <script>
+        const ICONS = {
+            shield:'<path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/>',
+            alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z"/>',
+            book:'<path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h12"/>',
+            logout:'<path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11M18 9l3 3-3 3"/>',
+            user:'<path d="M6 21v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1"/><circle cx="12" cy="8" r="4"/>',
+            flame:'<path d="M12 3c1 4-3 5-3 9a3 3 0 0 0 6 0c0-1-.5-2-1-3 2 1 3 3 3 5a5 5 0 0 1-10 0c0-4 4-6 5-11z"/>',
+            clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+            refresh:'<path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/><path d="M17 3v5h-5M7 21v-5h5"/>',
+            upload:'<path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+            lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+        };
+        function svgFor(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||'')+'</svg>'; }
+        function paintIcons(){ document.querySelectorAll('.ic[data-i]').forEach(el=>{ if(!el.dataset.done){ el.innerHTML=svgFor(el.dataset.i); el.dataset.done='1'; } }); }
+
+        const KEY='mb_cred';
+        function cred(){ return sessionStorage.getItem(KEY); }
+        function authHeader(){ return { 'Authorization':'Basic '+cred() }; }
+
+        const VIEW_TITLES = { alerts:'预警台账', kb:'知识库管理' };
+        function switchView(v){
+            document.querySelectorAll('.nav-item').forEach(n=> n.classList.toggle('active', n.dataset.view===v));
+            document.getElementById('view-alerts').classList.toggle('hidden', v!=='alerts');
+            document.getElementById('view-kb').classList.toggle('hidden', v!=='kb');
+            document.getElementById('viewTitle').textContent = VIEW_TITLES[v];
+        }
+        function kbSoon(){ alert('知识库管理功能即将上线~'); }
+        function logout(){ sessionStorage.removeItem(KEY); location.href='/index.html'; }
+
+        function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+
+        function renderAlerts(list){
+            document.getElementById('stTotal').textContent = list.length;
+            document.getElementById('stHigh').textContent = list.filter(a=>a.level==='HIGH').length;
+            const today = new Date().toDateString();
+            document.getElementById('stToday').textContent = list.filter(a=> new Date(a.createdAt).toDateString()===today).length;
+
+            const body = document.getElementById('alertsBody');
+            if(list.length===0){
+                body.innerHTML = '<div class="empty"><span class="ic" data-i="shield"></span>暂无预警记录，一切平安</div>';
+                paintIcons(); return;
+            }
+            let rows = '';
+            for(const a of list){
+                const t = new Date(a.createdAt).toLocaleString('zh-CN');
+                rows += '<tr>'
+                    + '<td style="white-space:nowrap;color:#6b7280">'+esc(t)+'</td>'
+                    + '<td><b>'+esc(a.userId)+'</b></td>'
+                    + '<td><span class="badge lv-'+a.level+'">'+a.level+'</span></td>'
+                    + '<td class="emo">'+esc(a.emotion)+'</td>'
+                    + '<td class="msg-cell">'+esc(a.userMessage)+'</td>'
+                    + '<td class="emo">'+esc(a.reason)+'</td>'
+                    + '</tr>';
+            }
+            body.innerHTML = '<table><thead><tr>'
+                + '<th>时间</th><th>学生</th><th>风险等级</th><th>情绪</th><th>原话</th><th>研判理由</th>'
+                + '</tr></thead><tbody>'+rows+'</tbody></table>';
+        }
+
+        async function loadAlerts(){
+            try {
+                const r = await fetch('/api/admin/alerts', { headers: authHeader() });
+                if(r.status===401){ location.href='/index.html'; return; }
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok){ document.getElementById('alertsBody').innerHTML='<div class="empty">加载失败('+r.status+')</div>'; return; }
+                renderAlerts(await r.json());
+            } catch(e){ document.getElementById('alertsBody').innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+
+        function showBlocker(msg){
+            document.getElementById('shell').style.display='none';
+            document.getElementById('blockerMsg').textContent = msg;
+            document.getElementById('blocker').style.display='flex';
+            paintIcons();
+        }
+
+        (async function init(){
+            paintIcons();
+            if(!cred()){ location.href='/index.html'; return; }
+            try {
+                const r = await fetch('/api/auth/me', { headers: authHeader() });
+                if(!r.ok){ location.href='/index.html'; return; }
+                const me = await r.json();
+                if(!(me.roles||[]).includes('ROLE_ADMIN')){ showBlocker('当前账号不是管理员，无权访问后台'); return; }
+                document.getElementById('adminName').textContent = me.nickname || me.username;
+                document.getElementById('shell').style.display='flex';
+                paintIcons();
+                loadAlerts();
+            } catch(e){ location.href='/index.html'; }
+        })();
+    </script>
+</body>
+</html>

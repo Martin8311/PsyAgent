@@ -36,8 +36,9 @@ public class SecurityConfig {
                 // 关闭表单登录(我们用 Basic)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .authorizeExchange(ex -> ex
-                        // 放行：首页、静态资源、注册、健康检查
-                        .pathMatchers("/", "/index.html", "/favicon.ico",
+                        // 放行：首页、所有静态页(*.html)、静态资源、注册、健康检查
+                        // 注意：页面本身放行，真正的数据保护在 /api/admin/** 接口上
+                        .pathMatchers("/", "/*.html", "/favicon.ico",
                                 "/css/**", "/js/**", "/actuator/health").permitAll()
                         .pathMatchers("/api/auth/register").permitAll()
                         // 管理员后台

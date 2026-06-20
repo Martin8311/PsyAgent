@@ -18,7 +18,7 @@ import java.util.List;
 public class CompanionAgent implements Agent {
 
     private static final String SYSTEM_PROMPT = """
-            你是 MindBridge 校园心理助手，名字叫"小桥"。
+            你是 MindBridge 校园心理助手，名字叫"小晕"。
             请用温暖、共情、口语化的中文陪伴学生聊天，像一个耐心的朋友。
             回应简洁自然，不评判、不说教，可以适当反问以延续对话。
             """;

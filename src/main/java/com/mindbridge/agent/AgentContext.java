@@ -1,6 +1,7 @@
 package com.mindbridge.agent;
 
 import com.mindbridge.ai.ChatMessage;
+import com.mindbridge.risk.RiskAssessment;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ public class AgentContext {
     private final List<String> knowledgeSnippets = new ArrayList<>();
 
     // ===== 风险评估(Phase 5) =====
-    private Object riskResult;   // 后续替换为 RiskAssessment 类型
+    private RiskAssessment risk;
 
     // ===== 最终回复流 =====
     private Flux<String> responseStream;
@@ -85,12 +86,12 @@ public class AgentContext {
         return knowledgeSnippets;
     }
 
-    public Object getRiskResult() {
-        return riskResult;
+    public RiskAssessment getRisk() {
+        return risk;
     }
 
-    public void setRiskResult(Object riskResult) {
-        this.riskResult = riskResult;
+    public void setRisk(RiskAssessment risk) {
+        this.risk = risk;
     }
 
     public Flux<String> getResponseStream() {

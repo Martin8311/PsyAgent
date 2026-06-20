@@ -3,18 +3,30 @@ package com.mindbridge.agent.impl;
 import com.mindbridge.agent.Agent;
 import com.mindbridge.agent.AgentContext;
 import com.mindbridge.agent.Intent;
+import com.mindbridge.risk.AlertService;
+import com.mindbridge.risk.RiskAssessment;
+import com.mindbridge.risk.RiskAssessmentService;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 /**
  * 风控 Agent：对 CONSULT/RISK 场景进行心理风险评估
- * (风险等级 LOW/MEDIUM/HIGH + 情绪标签)，高风险触发预警。
+ * （风险等级 LOW/MEDIUM/HIGH + 情绪标签），HIGH 触发自动预警。
  *
- * <p>Phase 2 占位（标记已评估）；Phase 5 接入「高风险词硬规则 + LLM 结构化
- * JSON 输出」，并联动 MCP 写 Excel 台账 / 发邮件预警。
+ * <p>评估委托 {@link RiskAssessmentService}（硬规则优先 + LLM 结构化 + 关键词兜底）；
+ * 高风险时由 {@link AlertService} 落库台账并告警。结果写回 Context，
+ * 供 CounselorAgent 注入 prompt。
  */
 @Component
 public class RiskGuardianAgent implements Agent {
+
+    private final RiskAssessmentService riskAssessmentService;
+    private final AlertService alertService;
+
+    public RiskGuardianAgent(RiskAssessmentService riskAssessmentService, AlertService alertService) {
+        this.riskAssessmentService = riskAssessmentService;
+        this.alertService = alertService;
+    }
 
     @Override
     public String name() {
@@ -31,15 +43,22 @@ public class RiskGuardianAgent implements Agent {
         Intent intent = context.getIntent();
         return (intent == Intent.CONSULT || intent == Intent.RISK)
                 && context.isKnowledgeRetrieved()
-                && context.getRiskResult() == null;
+                && context.getRisk() == null;
     }
 
     @Override
     public Mono<Void> act(AgentContext context) {
-        return Mono.fromRunnable(() -> {
-            // TODO Phase 5: 硬规则 + LLM 结构化风险评估，高风险触发 MCP 预警
-            context.setRiskResult("UNASSESSED(Phase 2 placeholder)");
-            context.trace("risk", "assessed(placeholder)");
-        });
+        return riskAssessmentService.assess(context.getUserInput())
+                .flatMap(risk -> {
+                    context.setRisk(risk);
+                    context.trace("risk", risk.level() + "/" + risk.emotion()
+                            + (risk.byHardRule() ? "(硬规则)" : ""));
+                    if (risk.isHigh()) {
+                        return alertService.raise(context.getUserId(), risk, context.getUserInput())
+                                .thenReturn(risk);
+                    }
+                    return Mono.just(risk);
+                })
+                .then();
     }
 }

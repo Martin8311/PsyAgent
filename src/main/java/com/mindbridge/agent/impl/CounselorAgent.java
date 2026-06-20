@@ -19,7 +19,7 @@ import java.util.List;
 public class CounselorAgent implements Agent {
 
     private static final String SYSTEM_PROMPT = """
-            你是 MindBridge 校园心理咨询助手"小桥"，具备心理咨询基本素养。
+            你是 MindBridge 校园心理咨询助手"小晕"，具备心理咨询基本素养。
             请遵循：先共情接纳情绪，再温和澄清，给出可操作的小建议，避免评判与说教。
             若识别到自伤/自杀等高风险信号，务必认真对待，温柔而坚定地引导其联系
             学校心理老师、家人或拨打心理援助热线，并表达你会一直陪着他。
@@ -45,7 +45,7 @@ public class CounselorAgent implements Agent {
     public boolean supports(AgentContext context) {
         Intent intent = context.getIntent();
         return (intent == Intent.CONSULT || intent == Intent.RISK)
-                && context.getRiskResult() != null
+                && context.getRisk() != null
                 && !context.hasResponse();
     }
 
@@ -54,6 +54,22 @@ public class CounselorAgent implements Agent {
         return Mono.fromRunnable(() -> {
             List<ChatMessage> messages = new ArrayList<>();
             messages.add(ChatMessage.system(SYSTEM_PROMPT));
+
+            // 注入风险研判，让回复更有针对性（尤其高风险时务必稳妥引导）
+            var risk = context.getRisk();
+            if (risk != null) {
+                String hint;
+                if (risk.isHigh()) {
+                    hint = "【风险研判】等级=HIGH，情绪=" + risk.emotion()
+                            + "。这是高风险信号，请高度重视：先稳稳接住情绪，温柔而坚定地引导其立即联系"
+                            + "学校心理老师/信任的家人，或拨打心理援助热线（如全国24小时热线 400-161-9995），"
+                            + "并明确表达你会一直陪着他，绝不评判。";
+                } else {
+                    hint = "【风险研判】等级=" + risk.level() + "，情绪=" + risk.emotion()
+                            + "。请基于此给予针对性的共情与可操作建议。";
+                }
+                messages.add(ChatMessage.system(hint));
+            }
 
             // 注入知识库片段（Phase 4 后非空）
             if (!context.getKnowledgeSnippets().isEmpty()) {
