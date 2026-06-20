@@ -2,49 +2,64 @@ package com.mindbridge.controller;
 
 import com.mindbridge.agent.AgentContext;
 import com.mindbridge.agent.AgentRuntimeService;
+import com.mindbridge.ai.ChatMessage;
+import com.mindbridge.memory.ChatMemoryService;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * 学生端聊天入口。
  *
- * <p>统一经过 {@link AgentRuntimeService} 多 Agent 调度：
- * MemoryAgent → SupervisorAgent → 按意图分支(Companion / Knowledge→Risk→Counselor)
- * → 流式 SSE 返回。
+ * <p>用户身份取自 Spring Security 登录上下文；经 {@link AgentRuntimeService}
+ * 多 Agent 调度后流式返回，并在回答结束后把本轮对话写回 Redis 会话记录。
  */
 @RestController
 public class ChatController {
 
-    /** Phase 2 暂以固定值代表匿名学生；Phase 3 接入安全上下文取真实身份。 */
     private static final String ANONYMOUS_USER = "anonymous";
 
     private final AgentRuntimeService agentRuntime;
+    private final ChatMemoryService chatMemoryService;
 
-    public ChatController(AgentRuntimeService agentRuntime) {
+    public ChatController(AgentRuntimeService agentRuntime, ChatMemoryService chatMemoryService) {
         this.agentRuntime = agentRuntime;
+        this.chatMemoryService = chatMemoryService;
     }
 
-    /** POST 方式，正式入口。 */
     @PostMapping(value = "/api/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chat(@RequestBody ChatRequest request) {
-        return stream(ANONYMOUS_USER, request.message());
+        return currentUserId().flatMapMany(userId -> stream(userId, request.message()));
     }
 
-    /** GET 方式，便于浏览器/curl 快速测试。 */
     @GetMapping(value = "/api/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chatStream(@RequestParam("message") String message) {
-        return stream(ANONYMOUS_USER, message);
+        return currentUserId().flatMapMany(userId -> stream(userId, message));
+    }
+
+    /** 从响应式安全上下文取登录用户名，未登录则匿名。 */
+    private Mono<String> currentUserId() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .defaultIfEmpty(ANONYMOUS_USER);
     }
 
     private Flux<String> stream(String userId, String message) {
         AgentContext context = new AgentContext(userId, message);
-        return agentRuntime.run(context);
+        StringBuilder full = new StringBuilder();
+        return agentRuntime.run(context)
+                .doOnNext(full::append)
+                // 回答完整结束后，把这一轮对话写回 Redis(异步、失败不影响响应)
+                .doOnComplete(() -> chatMemoryService.appendTurn(userId,
+                        ChatMessage.user(message),
+                        ChatMessage.assistant(full.toString())).subscribe());
     }
 
     public record ChatRequest(@NotBlank String message) {

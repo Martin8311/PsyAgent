@@ -2,17 +2,22 @@ package com.mindbridge.agent.impl;
 
 import com.mindbridge.agent.Agent;
 import com.mindbridge.agent.AgentContext;
+import com.mindbridge.memory.ChatMemoryService;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 /**
- * 记忆 Agent：链路第一站，加载用户的短期/长期历史记忆到上下文。
- *
- * <p>Phase 2 先占位（标记记忆已加载）；Phase 3 接入 Redis 短期会话记忆
- * 与 JPA 长期消息持久化。
+ * 记忆 Agent：链路第一站，从 Redis 加载用户的会话记录(短期记忆)到上下文，
+ * 供后续 Companion/Counselor 拼进 prompt，实现多轮对话。
  */
 @Component
 public class MemoryAgent implements Agent {
+
+    private final ChatMemoryService chatMemoryService;
+
+    public MemoryAgent(ChatMemoryService chatMemoryService) {
+        this.chatMemoryService = chatMemoryService;
+    }
 
     @Override
     public String name() {
@@ -31,10 +36,12 @@ public class MemoryAgent implements Agent {
 
     @Override
     public Mono<Void> act(AgentContext context) {
-        return Mono.fromRunnable(() -> {
-            // TODO Phase 3: 从 Redis 加载短期记忆、从 DB 加载长期消息写入 history
-            context.setMemoryLoaded(true);
-            context.trace("memory", "loaded(empty in Phase 2)");
-        });
+        return chatMemoryService.loadHistory(context.getUserId())
+                .doOnNext(history -> {
+                    context.getHistory().addAll(history);
+                    context.setMemoryLoaded(true);
+                    context.trace("memory", "loaded " + history.size() + " msgs");
+                })
+                .then();
     }
 }

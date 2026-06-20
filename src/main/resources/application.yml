@@ -5,18 +5,43 @@ spring:
   application:
     name: mindbridge
 
+  # ===== MySQL (用户信息持久化) =====
+  datasource:
+    url: jdbc:mysql://localhost:3306/mindbridge?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: ${MYSQL_USERNAME:root}
+    # 密码走环境变量 MYSQL_PASSWORD，不写入代码库
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # 自动建表/更新表结构
+    open-in-view: false         # WebFlux 下关闭 OSIV
+    show-sql: false
+    properties:
+      hibernate.format_sql: true
+
+  # ===== Redis (会话记录/短期记忆) =====
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # 密码走环境变量 REDIS_PASSWORD，不写入代码库
+      password: ${REDIS_PASSWORD}
+
 # ===== MindBridge 自定义配置 =====
 mindbridge:
   ai:
-    # 当前启用的 AI 提供方: ollama | openai
     provider: ollama
     ollama:
       base-url: http://localhost:11434
-      # 简历中的微调模型: mindbridge-qwen2.5-7b-ft:latest
-      # 先用基座模型联通，待 ollama pull 后可切换
       model: qwen2.5:3b
-      # 单次请求超时(秒)
       timeout-seconds: 120
+  memory:
+    # 短期记忆保留的最大消息条数(user+assistant 合计)
+    max-messages: 20
+    # 会话记录在 Redis 中的过期天数
+    ttl-days: 7
 
 logging:
   level:
