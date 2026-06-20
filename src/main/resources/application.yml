@@ -70,4 +70,4 @@ mindbridge:
 
 logging:
   level:
-    com.mindbridge: DEBUG
+    com.mindbridge: INFO

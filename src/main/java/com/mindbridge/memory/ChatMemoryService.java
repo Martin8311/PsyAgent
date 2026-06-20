@@ -23,7 +23,7 @@ import java.util.List;
 public class ChatMemoryService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatMemoryService.class);
-    private static final String KEY_PREFIX = "chat:history:";
+    private static final String KEY_PREFIX = "chat:ctx:";
 
     private final ReactiveStringRedisTemplate redis;
     private final ObjectMapper objectMapper;
@@ -40,13 +40,13 @@ public class ChatMemoryService {
         this.ttl = Duration.ofDays(ttlDays);
     }
 
-    private String key(String userId) {
-        return KEY_PREFIX + userId;
+    private String key(Long sessionId) {
+        return KEY_PREFIX + sessionId;
     }
 
-    /** 读取该用户的历史消息（按时间顺序）。Redis 异常时降级为空历史。 */
-    public Mono<List<ChatMessage>> loadHistory(String userId) {
-        return redis.opsForList().range(key(userId), 0, -1)
+    /** 读取会话的近期消息（作为 AI 上下文窗口），Redis 异常时降级为空。 */
+    public Mono<List<ChatMessage>> loadHistory(Long sessionId) {
+        return redis.opsForList().range(key(sessionId), 0, -1)
                 .map(this::deserialize)
                 .collectList()
                 .onErrorResume(e -> {
@@ -55,9 +55,9 @@ public class ChatMemoryService {
                 });
     }
 
-    /** 追加一轮对话(用户问 + AI 答)，裁剪到最近 N 条并续期 TTL。 */
-    public Mono<Void> appendTurn(String userId, ChatMessage userMsg, ChatMessage assistantMsg) {
-        String k = key(userId);
+    /** 追加一轮对话到 Redis（短期上下文），裁剪到最近 N 条并续期 TTL。 */
+    public Mono<Void> appendTurn(Long sessionId, ChatMessage userMsg, ChatMessage assistantMsg) {
+        String k = key(sessionId);
         return redis.opsForList()
                 .rightPushAll(k, serialize(userMsg), serialize(assistantMsg))
                 .flatMap(n -> redis.opsForList().trim(k, -maxMessages, -1))
@@ -67,6 +67,12 @@ public class ChatMemoryService {
                     log.warn("写入会话记录失败: {}", e.getMessage());
                     return Mono.empty();
                 });
+    }
+
+    /** 删除会话的 Redis 上下文缓存（会话被删除时调用）。 */
+    public Mono<Void> clearSession(Long sessionId) {
+        return redis.delete(key(sessionId)).then()
+                .onErrorResume(e -> Mono.empty());
     }
 
     private String serialize(ChatMessage msg) {

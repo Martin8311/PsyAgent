@@ -19,6 +19,7 @@ public class AgentContext {
 
     // ===== 输入 =====
     private final String userId;
+    private final Long sessionId;
     private final String userInput;
 
     // ===== 记忆 / 历史 =====
@@ -41,18 +42,15 @@ public class AgentContext {
     /** 调试用：记录执行轨迹。 */
     private final Map<String, Object> trace = new LinkedHashMap<>();
 
-    public AgentContext(String userId, String userInput) {
+    public AgentContext(String userId, Long sessionId, String userInput) {
         this.userId = userId;
+        this.sessionId = sessionId;
         this.userInput = userInput;
     }
 
-    public String getUserId() {
-        return userId;
-    }
-
-    public String getUserInput() {
-        return userInput;
-    }
+    public String getUserId() { return userId; }
+    public Long getSessionId() { return sessionId; }
+    public String getUserInput() { return userInput; }
 
     public List<ChatMessage> getHistory() {
         return history;

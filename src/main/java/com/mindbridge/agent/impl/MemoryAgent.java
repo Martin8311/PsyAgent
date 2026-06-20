@@ -36,7 +36,7 @@ public class MemoryAgent implements Agent {
 
     @Override
     public Mono<Void> act(AgentContext context) {
-        return chatMemoryService.loadHistory(context.getUserId())
+        return chatMemoryService.loadHistory(context.getSessionId())
                 .doOnNext(history -> {
                     context.getHistory().addAll(history);
                     context.setMemoryLoaded(true);
