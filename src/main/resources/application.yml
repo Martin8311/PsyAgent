@@ -29,6 +29,23 @@ spring:
       # 密码走环境变量 REDIS_PASSWORD，不写入代码库
       password: ${REDIS_PASSWORD}
 
+  # ===== Spring AI (RAG: Ollama embedding + Chroma 向量库) =====
+  ai:
+    # 聊天仍由我们手写的 OllamaAiClient 负责；这里只启用 embedding，关掉 Spring AI 的 chat 自动配置
+    model:
+      chat: none
+      embedding: ollama
+    ollama:
+      base-url: http://localhost:11434
+      embedding:
+        options:
+          model: bge-m3          # 中文向量模型，需 ollama pull bge-m3
+    vectorstore:
+      chroma:
+        initialize-schema: true  # 启动时自动创建 collection（需 Chroma 服务已就绪）
+        collection-name: mindbridge_kb
+        # client.host/port 默认 http://localhost:8000，与 docker 一致，无需显式配置
+
 # ===== MindBridge 自定义配置 =====
 mindbridge:
   ai:
@@ -42,6 +59,14 @@ mindbridge:
     max-messages: 20
     # 会话记录在 Redis 中的过期天数
     ttl-days: 7
+  knowledge:
+    # RAG 检索返回的片段数
+    top-k: 3
+    # 相似度阈值：低于此分数的片段视为不相关，不注入回答
+    min-score: 0.3
+    # 文本切块：每块约 400 字，相邻块重叠 80 字以保留上下文
+    chunk-size: 400
+    chunk-overlap: 80
 
 logging:
   level:

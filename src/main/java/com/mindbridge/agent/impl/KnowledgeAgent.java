@@ -3,17 +3,32 @@ package com.mindbridge.agent.impl;
 import com.mindbridge.agent.Agent;
 import com.mindbridge.agent.AgentContext;
 import com.mindbridge.agent.Intent;
+import com.mindbridge.knowledge.KnowledgeBaseService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
- * 知识 Agent：CONSULT/RISK 分支，从心理知识库检索相关资料(RAG)，
- * 为 CounselorAgent 的专业回复提供依据。
+ * 知识 Agent：CONSULT/RISK 分支，从心理知识库做语义检索(RAG)，
+ * 把 top-k 片段写入 Context，为 CounselorAgent 的专业回复提供依据。
  *
- * <p>Phase 2 占位（不检索，直接放行）；Phase 4 接入向量检索 + 上下文扩展。
+ * <p>检索委托 {@link KnowledgeBaseService}（Chroma 向量库 + bge-m3）。
+ * 为保证健壮性：即便知识库为空或 Chroma 暂不可用，也只是不注入片段、
+ * 不打断链路（下游风控/回复照常进行）。
  */
 @Component
 public class KnowledgeAgent implements Agent {
+
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeAgent.class);
+
+    private final KnowledgeBaseService knowledgeBaseService;
+
+    public KnowledgeAgent(KnowledgeBaseService knowledgeBaseService) {
+        this.knowledgeBaseService = knowledgeBaseService;
+    }
 
     @Override
     public String name() {
@@ -34,10 +49,16 @@ public class KnowledgeAgent implements Agent {
 
     @Override
     public Mono<Void> act(AgentContext context) {
-        return Mono.fromRunnable(() -> {
-            // TODO Phase 4: 调用 RagService 检索 top-k 片段写入 context.knowledgeSnippets
-            context.setKnowledgeRetrieved(true);
-            context.trace("knowledge", "retrieved(empty in Phase 2)");
-        });
+        return knowledgeBaseService.search(context.getUserInput())
+                .onErrorResume(e -> {
+                    log.warn("知识检索失败，跳过 RAG（不影响后续回复）: {}", e.toString());
+                    return Mono.just(List.of());
+                })
+                .doOnNext(snippets -> {
+                    context.getKnowledgeSnippets().addAll(snippets);
+                    context.setKnowledgeRetrieved(true);
+                    context.trace("knowledge", "retrieved " + snippets.size() + " snippets");
+                })
+                .then();
     }
 }

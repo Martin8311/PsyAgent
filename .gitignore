@@ -19,3 +19,4 @@ Thumbs.db
 ### App ###
 *.log
 /data/
+/chroma_data/

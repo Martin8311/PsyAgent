@@ -100,10 +100,38 @@
         .uploader:hover{ border-color:var(--primary); background:rgba(99,102,241,.06); color:var(--primary); }
         .uploader .ic{ font-size:38px; display:block; width:38px; margin:0 auto 12px; }
         .soon-tip{ display:inline-block; margin-top:10px; font-size:12px; background:rgba(139,92,246,.12); color:var(--primary); padding:3px 10px; border-radius:9px; }
+        .kb-msg{ margin-top:14px; padding:10px 14px; border-radius:11px; font-size:13px; }
+        .kb-msg.ok{ background:#e3f6ec; color:#0f7a52; }
+        .kb-msg.err{ background:#fde7ec; color:#c11d45; }
+        .kb-msg.load{ background:rgba(99,102,241,.08); color:var(--primary); }
+        .btn-del{ display:inline-flex; align-items:center; gap:5px; color:#c11d45; background:rgba(225,29,69,.08);
+            border:1px solid rgba(225,29,69,.18); padding:5px 11px; border-radius:9px; cursor:pointer; font-size:12px; font-family:inherit; }
+        .btn-del:hover{ background:rgba(225,29,69,.16); }
+        .btn-preview{ display:inline-flex; align-items:center; gap:5px; color:var(--primary); background:rgba(99,102,241,.08);
+            border:1px solid rgba(99,102,241,.2); padding:5px 11px; border-radius:9px; cursor:pointer; font-size:12px; font-family:inherit; margin-right:4px; }
+        .btn-preview:hover{ background:rgba(99,102,241,.16); }
+        .btn-chunks{ display:inline-flex; align-items:center; gap:5px; color:#0f7a52; background:rgba(15,122,82,.07);
+            border:1px solid rgba(15,122,82,.2); padding:5px 11px; border-radius:9px; cursor:pointer; font-size:12px; font-family:inherit; margin-right:4px; }
+        .btn-chunks:hover{ background:rgba(15,122,82,.14); }
+        .chunk-card{ background:rgba(99,102,241,.05); border:1px solid var(--line); border-radius:10px; padding:12px 14px;
+            margin-bottom:10px; font-size:13px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+        .chunk-label{ font-size:11px; color:var(--primary); font-weight:600; margin-bottom:6px; }
         .hidden{ display:none; }
         .center-msg{ display:flex; align-items:center; justify-content:center; height:60vh; color:var(--muted); flex-direction:column; gap:14px; }
         .center-msg .ic{ font-size:48px; color:#c7c5e0; }
         .center-msg a{ color:var(--primary); }
+        /* 内容预览弹窗 */
+        .modal-overlay{ position:fixed; inset:0; background:rgba(30,27,58,.45); z-index:100; display:flex; align-items:center; justify-content:center; }
+        .modal-box{ background:#fff; border-radius:20px; width:min(760px,92vw); max-height:82vh; display:flex; flex-direction:column;
+            box-shadow:0 24px 64px -16px rgba(80,70,180,.5); overflow:hidden; }
+        .modal-head{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px;
+            border-bottom:1px solid var(--line); }
+        .modal-head h3{ margin:0; font-size:16px; font-weight:600; }
+        .modal-close{ cursor:pointer; color:var(--muted); font-size:22px; line-height:1; background:none; border:none; padding:0 4px; }
+        .modal-close:hover{ color:var(--ink); }
+        .modal-body{ flex:1; overflow-y:auto; padding:20px 24px; }
+        .modal-body pre{ margin:0; white-space:pre-wrap; word-break:break-word; font-family:"Microsoft YaHei",system-ui,sans-serif;
+            font-size:14px; line-height:1.8; color:var(--ink); }
     </style>
 </head>
 <body>
@@ -118,7 +146,7 @@
                 <div class="nav-item active" data-view="alerts" onclick="switchView('alerts')">
                     <span class="ic" data-i="alert"></span>预警台账</div>
                 <div class="nav-item" data-view="kb" onclick="switchView('kb')">
-                    <span class="ic" data-i="book"></span>知识库管理<span class="soon">即将上线</span></div>
+                    <span class="ic" data-i="book"></span>知识库管理</div>
             </nav>
             <div class="side-foot">
                 <div class="logout" onclick="logout()"><span class="ic" data-i="logout"></span>退出登录</div>
@@ -149,24 +177,40 @@
                     </div>
                 </div>
 
-                <!-- 知识库管理(占位框架) -->
+                <!-- 知识库管理(RAG) -->
                 <div id="view-kb" class="hidden">
                     <div class="panel">
                         <div class="panel-head">
                             <h2><span class="ic" data-i="upload"></span>上传知识文档</h2>
+                            <span class="emo">支持 .txt / .md，上传后自动切块、向量化入库</span>
                         </div>
-                        <div class="uploader" onclick="kbSoon()">
+                        <input type="file" id="kbFile" accept=".txt,.md" class="hidden" onchange="uploadKbFile(this)">
+                        <div class="uploader" onclick="document.getElementById('kbFile').click()">
                             <span class="ic" data-i="upload"></span>
-                            点击或拖拽上传 Markdown / PDF / TXT 心理知识文档
-                            <div class="soon-tip">功能开发中 · 即将上线</div>
+                            点击选择 Markdown / TXT 心理知识文档上传
                         </div>
+                        <div id="kbUploadMsg" class="kb-msg hidden"></div>
                     </div>
                     <div class="panel" style="margin-top:16px">
-                        <div class="panel-head"><h2><span class="ic" data-i="book"></span>知识文档列表</h2></div>
-                        <div class="empty"><span class="ic" data-i="book"></span>知识库管理功能开发中，敬请期待<br>未来可在此查看、检索、删除已入库的文档</div>
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="book"></span>知识文档列表</h2>
+                            <button class="btn-ghost" onclick="loadKbDocs()"><span class="ic" data-i="refresh"></span>刷新</button>
+                        </div>
+                        <div id="kbDocsBody"></div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 内容预览弹窗 -->
+    <div class="modal-overlay" id="previewModal" style="display:none" onclick="closePreview(event)">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="previewTitle">文档内容</h3>
+                <button class="modal-close" onclick="hideModal()">×</button>
+            </div>
+            <div class="modal-body"><pre id="previewContent">加载中…</pre></div>
         </div>
     </div>
 
@@ -188,7 +232,8 @@
             clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
             refresh:'<path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/><path d="M17 3v5h-5M7 21v-5h5"/>',
             upload:'<path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
-            lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+            lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+            trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>'
         };
         function svgFor(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||'')+'</svg>'; }
         function paintIcons(){ document.querySelectorAll('.ic[data-i]').forEach(el=>{ if(!el.dataset.done){ el.innerHTML=svgFor(el.dataset.i); el.dataset.done='1'; } }); }
@@ -203,9 +248,125 @@
             document.getElementById('view-alerts').classList.toggle('hidden', v!=='alerts');
             document.getElementById('view-kb').classList.toggle('hidden', v!=='kb');
             document.getElementById('viewTitle').textContent = VIEW_TITLES[v];
+            if(v==='kb') loadKbDocs();
         }
-        function kbSoon(){ alert('知识库管理功能即将上线~'); }
         function logout(){ sessionStorage.removeItem(KEY); location.href='/index.html'; }
+
+        // ===== 知识库管理(RAG) =====
+        const kbDocsCache = {};   // id → title，避免 onclick 内联传字符串引发引号冲突
+
+        async function loadKbDocs(){
+            const body=document.getElementById('kbDocsBody');
+            body.innerHTML='<div class="empty">加载中…</div>';
+            try{
+                const r=await fetch('/api/admin/kb/docs',{ headers:authHeader() });
+                if(r.status===401){ location.href='/index.html'; return; }
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok){ body.innerHTML='<div class="empty">加载失败('+r.status+')</div>'; return; }
+                renderKbDocs(await r.json());
+            }catch(e){ body.innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+        function renderKbDocs(list){
+            const body=document.getElementById('kbDocsBody');
+            if(!list.length){
+                body.innerHTML='<div class="empty"><span class="ic" data-i="book"></span>知识库还是空的，上传第一篇心理资料吧</div>';
+                paintIcons(); return;
+            }
+            let rows='';
+            for(const d of list){
+                kbDocsCache[d.id]=d.title;
+                const t=new Date(d.createdAt).toLocaleString('zh-CN');
+                rows+='<tr>'
+                    +'<td><b>'+esc(d.title)+'</b></td>'
+                    +'<td class="emo">'+esc(d.filename)+'</td>'
+                    +'<td class="emo">'+d.charCount+' 字</td>'
+                    +'<td><span class="badge lv-LOW">'+d.chunkCount+' 块</span></td>'
+                    +'<td style="white-space:nowrap;color:#6b7280">'+esc(t)+'</td>'
+                    +'<td style="white-space:nowrap">'
+                    +'<button class="btn-preview" onclick="previewDoc('+d.id+')">原文</button>'
+                    +'<button class="btn-chunks" onclick="previewChunks('+d.id+')">切块</button>'
+                    +'<button class="btn-del" onclick="deleteKbDoc('+d.id+')"><span class="ic" data-i="trash"></span>删除</button>'
+                    +'</td>'
+                    +'</tr>';
+            }
+            body.innerHTML='<table><thead><tr>'
+                +'<th>标题</th><th>文件名</th><th>字符数</th><th>切块</th><th>上传时间</th><th>操作</th>'
+                +'</tr></thead><tbody>'+rows+'</tbody></table>';
+            paintIcons();
+        }
+        async function uploadKbFile(input){
+            const file=input.files[0]; if(!file) return;
+            const msg=document.getElementById('kbUploadMsg');
+            msg.classList.remove('hidden'); msg.className='kb-msg load';
+            msg.textContent='正在上传并向量化「'+file.name+'」，首次可能稍慢…';
+            const fd=new FormData(); fd.append('file', file);
+            try{
+                const r=await fetch('/api/admin/kb/upload',{ method:'POST', headers:authHeader(), body:fd });
+                input.value='';
+                if(r.ok){
+                    const d=await r.json();
+                    msg.className='kb-msg ok'; msg.textContent='✓ 入库成功：'+d.title+'（切了 '+d.chunkCount+' 块）';
+                    loadKbDocs();
+                } else {
+                    let detail=''; try{ detail=(await r.json()).message||''; }catch(_){}
+                    msg.className='kb-msg err'; msg.textContent='上传失败（'+r.status+'）'+(detail?'：'+detail:'');
+                }
+            }catch(e){ msg.className='kb-msg err'; msg.textContent='网络错误：'+e.message; }
+        }
+        async function deleteKbDoc(id){
+            if(!confirm('确定删除这篇文档？它在知识库中的向量也会一并移除。')) return;
+            try{
+                const r=await fetch('/api/admin/kb/docs/'+id,{ method:'DELETE', headers:authHeader() });
+                if(r.ok){ loadKbDocs(); }
+                else if(r.status===401){ location.href='/index.html'; }
+                else{ alert('删除失败（'+r.status+'）'); }
+            }catch(e){ alert('网络错误：'+e.message); }
+        }
+        function hideModal(){ document.getElementById('previewModal').style.display='none'; }
+
+        async function previewChunks(id){
+            const modal=document.getElementById('previewModal');
+            document.getElementById('previewTitle').textContent=(kbDocsCache[id]||'文档')+' — 切块内容';
+            document.getElementById('previewContent').innerHTML='<span style="color:#6b7280">加载中…</span>';
+            modal.style.display='flex';
+            try{
+                const r=await fetch('/api/admin/kb/docs/'+id+'/chunks',{ headers:authHeader() });
+                if(!r.ok){ document.getElementById('previewContent').textContent='加载失败（'+r.status+'）'; return; }
+                const d=await r.json();
+                if(!d.chunks||!d.chunks.length){
+                    document.getElementById('previewContent').textContent='（此文档在新版本前上传，内容未保存，请删除后重新上传）';
+                    return;
+                }
+                let html='';
+                d.chunks.forEach(function(c,i){
+                    html+='<div class="chunk-card"><div class="chunk-label">第 '+(i+1)+' 块 / 共 '+d.chunks.length+' 块（'
+                        +c.length+' 字符）</div>'+esc(c)+'</div>';
+                });
+                document.getElementById('previewContent').innerHTML=html;
+            }catch(e){ document.getElementById('previewContent').textContent='网络错误：'+e.message; }
+        }
+
+        async function previewDoc(id){
+            const modal=document.getElementById('previewModal');
+            document.getElementById('previewTitle').textContent=kbDocsCache[id]||'文档内容';
+            document.getElementById('previewContent').textContent='加载中…';
+            modal.style.display='flex';
+            try{
+                const r=await fetch('/api/admin/kb/docs/'+id+'/content',{ headers:authHeader() });
+                if(r.ok){
+                    const d=await r.json();
+                    document.getElementById('previewContent').textContent=d.content||'（此文档在新版本前上传，内容未保存，请删除后重新上传）';
+                } else {
+                    document.getElementById('previewContent').textContent='加载失败（'+r.status+'）';
+                }
+            }catch(e){ document.getElementById('previewContent').textContent='网络错误：'+e.message; }
+        }
+        function closePreview(e){
+            if(e.target.id==='previewModal') hideModal();
+        }
+        document.addEventListener('keydown', function(e){
+            if(e.key==='Escape') hideModal();
+        });
 
         function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
 

@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
+        <version>3.4.13</version>
         <relativePath/>
     </parent>
 
@@ -19,6 +19,8 @@
 
     <properties>
         <java.version>17</java.version>
+        <!-- Spring AI 1.0.x 线对应 Spring Boot 3.4.x -->
+        <spring-ai.version>1.0.9</spring-ai.version>
     </properties>
 
     <dependencies>
@@ -63,6 +65,18 @@
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
         </dependency>
 
+        <!-- Spring AI: RAG 知识库 -->
+        <!-- Ollama embedding(bge-m3) 向量化；聊天仍用我们手写的 OllamaAiClient -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-ollama</artifactId>
+        </dependency>
+        <!-- Chroma 向量库(HNSW 近似最近邻检索) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-chroma</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -75,6 +89,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!-- Spring AI BOM：统一管理 spring-ai-* 的版本 -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
