@@ -18,13 +18,23 @@ public interface AiClient {
     String provider();
 
     /**
-     * 流式对话：逐 token 返回增量文本片段，用于 SSE 流式输出。
+     * 流式对话(带调用元信息)：逐 token 返回增量文本，用于 SSE 流式输出，
+     * 同时按 meta 归因记录 token 用量。
      */
-    Flux<String> streamChat(List<ChatMessage> messages);
+    Flux<String> streamChat(List<ChatMessage> messages, LlmCallMeta meta);
 
     /**
-     * 阻塞式对话：返回完整文本，用于 Agent 内部需要完整结果的场景
-     * (如风险评估的结构化 JSON 输出)。
+     * 阻塞式对话(带调用元信息)：返回完整文本，用于 Agent 内部需要完整结果的场景。
      */
-    Mono<String> chat(List<ChatMessage> messages);
+    Mono<String> chat(List<ChatMessage> messages, LlmCallMeta meta);
+
+    /** 流式对话(不归因，记为 UNKNOWN)。 */
+    default Flux<String> streamChat(List<ChatMessage> messages) {
+        return streamChat(messages, LlmCallMeta.UNKNOWN);
+    }
+
+    /** 阻塞式对话(不归因，记为 UNKNOWN)。 */
+    default Mono<String> chat(List<ChatMessage> messages) {
+        return chat(messages, LlmCallMeta.UNKNOWN);
+    }
 }

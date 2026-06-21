@@ -16,4 +16,8 @@ public interface UserMemoryRepository extends JpaRepository<UserMemory, Long> {
     /** 按 userId + memoryKey 找有效事实，用于去重覆盖。 */
     Optional<UserMemory> findFirstByUserIdAndTypeAndMemoryKeyAndStatus(
             String userId, String type, String memoryKey, String status);
+
+    /** 按 userId + 来源会话找有效摘要，用于一个会话维护一条摘要(覆盖更新)。 */
+    Optional<UserMemory> findFirstByUserIdAndTypeAndSourceSessionIdAndStatus(
+            String userId, String type, Long sourceSessionId, String status);
 }

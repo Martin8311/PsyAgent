@@ -59,6 +59,25 @@ public class LongTermMemoryService {
         repo.save(new UserMemory(userId, UserMemory.TYPE_FACT, key, fact, sessionId, confidence));
     }
 
+    /** 保存/更新某会话的摘要：一个会话维护一条(按 sourceSessionId 覆盖)，随对话推进更新。 */
+    @Transactional
+    public void upsertSummary(String userId, Long sessionId, String content) {
+        if (content == null || content.isBlank() || sessionId == null) {
+            return;
+        }
+        String summary = content.trim();
+        Optional<UserMemory> existing = repo.findFirstByUserIdAndTypeAndSourceSessionIdAndStatus(
+                userId, UserMemory.TYPE_SUMMARY, sessionId, UserMemory.STATUS_ACTIVE);
+        if (existing.isPresent()) {
+            UserMemory m = existing.get();
+            m.setContent(summary);
+            m.setUpdatedAt(Instant.now());
+            repo.save(m);
+        } else {
+            repo.save(new UserMemory(userId, UserMemory.TYPE_SUMMARY, null, summary, sessionId, 1.0));
+        }
+    }
+
     /** 召回用于注入 prompt 的记忆文本(置信度达标的事实 + 最近一条会话摘要)。 */
     @Transactional(readOnly = true)
     public List<String> recall(String userId) {
@@ -70,8 +89,8 @@ public class LongTermMemoryService {
                 .forEach(m -> out.add("· " + m.getContent()));
         repo.findByUserIdAndTypeAndStatusOrderByUpdatedAtDesc(
                         userId, UserMemory.TYPE_SUMMARY, UserMemory.STATUS_ACTIVE).stream()
-                .findFirst()
-                .ifPresent(m -> out.add("最近一次交流：" + m.getContent()));
+                .limit(2)
+                .forEach(m -> out.add("最近交流回顾：" + m.getContent()));
         return out;
     }
 

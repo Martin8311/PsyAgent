@@ -33,9 +33,19 @@ public class AiProperties {
         private String baseUrl = "http://localhost:11434";
         private String model = "qwen2.5:3b";
         private int timeoutSeconds = 120;
+        /** 上下文窗口大小(token)。Ollama 默认仅 2048，prompt 易被静默截断，显式调大。 */
+        private int numCtx = 8192;
 
         public String getBaseUrl() {
             return baseUrl;
+        }
+
+        public int getNumCtx() {
+            return numCtx;
+        }
+
+        public void setNumCtx(int numCtx) {
+            this.numCtx = numCtx;
         }
 
         public void setBaseUrl(String baseUrl) {

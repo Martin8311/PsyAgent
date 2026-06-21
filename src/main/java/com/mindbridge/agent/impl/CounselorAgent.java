@@ -5,6 +5,8 @@ import com.mindbridge.agent.AgentContext;
 import com.mindbridge.agent.Intent;
 import com.mindbridge.ai.AiClient;
 import com.mindbridge.ai.ChatMessage;
+import com.mindbridge.ai.ContextBudgetService;
+import com.mindbridge.ai.LlmCallMeta;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -26,9 +28,11 @@ public class CounselorAgent implements Agent {
             """;
 
     private final AiClient aiClient;
+    private final ContextBudgetService budgetService;
 
-    public CounselorAgent(AiClient aiClient) {
+    public CounselorAgent(AiClient aiClient, ContextBudgetService budgetService) {
         this.aiClient = aiClient;
+        this.budgetService = budgetService;
     }
 
     @Override
@@ -52,8 +56,9 @@ public class CounselorAgent implements Agent {
     @Override
     public Mono<Void> act(AgentContext context) {
         return Mono.fromRunnable(() -> {
-            List<ChatMessage> messages = new ArrayList<>();
-            messages.add(ChatMessage.system(SYSTEM_PROMPT));
+            // 固定前置(必保)：系统提示 + 风险研判 + 知识 + 长期记忆
+            List<ChatMessage> head = new ArrayList<>();
+            head.add(ChatMessage.system(SYSTEM_PROMPT));
 
             // 注入风险研判，让回复更有针对性（尤其高风险时务必稳妥引导）
             var risk = context.getRisk();
@@ -68,26 +73,29 @@ public class CounselorAgent implements Agent {
                     hint = "【风险研判】等级=" + risk.level() + "，情绪=" + risk.emotion()
                             + "。请基于此给予针对性的共情与可操作建议。";
                 }
-                messages.add(ChatMessage.system(hint));
+                head.add(ChatMessage.system(hint));
             }
 
             // 注入知识库片段（Phase 4 后非空）
             if (!context.getKnowledgeSnippets().isEmpty()) {
                 String knowledge = String.join("\n---\n", context.getKnowledgeSnippets());
-                messages.add(ChatMessage.system("可参考的心理知识资料：\n" + knowledge));
+                head.add(ChatMessage.system("可参考的心理知识资料：\n" + knowledge));
             }
 
             // 注入长期记忆（跨会话用户画像），让回复延续过往的了解与关系
             if (!context.getLongMemory().isEmpty()) {
                 String mem = String.join("\n", context.getLongMemory());
-                messages.add(ChatMessage.system("关于这位同学，你在过往交流中已了解(仅供参考，"
+                head.add(ChatMessage.system("关于这位同学，你在过往交流中已了解(仅供参考，"
                         + "请自然地体现关心与连续性，不要生硬复述这些条目)：\n" + mem));
             }
 
-            messages.addAll(context.getHistory());
-            messages.add(ChatMessage.user(context.getUserInput()));
-            context.setResponseStream(aiClient.streamChat(messages));
-            context.trace("counselor", "responded");
+            // 上下文护栏：在预算内保留尽量多的近期历史，超出从最旧裁剪
+            ContextBudgetService.Fit fit = budgetService.fit(head, context.getHistory(),
+                    ChatMessage.user(context.getUserInput()));
+            context.setResponseStream(aiClient.streamChat(fit.messages(),
+                    LlmCallMeta.of(LlmCallMeta.Purpose.CHAT, context.getUserId(), context.getSessionId())));
+            context.trace("counselor", "responded est=" + fit.estTokens() + "/" + fit.budget()
+                    + " droppedHist=" + fit.droppedHistory());
         });
     }
 }

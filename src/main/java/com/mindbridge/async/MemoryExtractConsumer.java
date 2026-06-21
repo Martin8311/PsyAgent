@@ -21,5 +21,7 @@ public class MemoryExtractConsumer {
     public void onMemoryExtract(MemoryExtractMessage message) {
         extractionService.extract(message.userId(), message.sessionId(),
                 message.question(), message.answer());
+        // 抽完事实后按需更新该会话摘要(内部有降频与最短长度判断)
+        extractionService.summarizeIfDue(message.userId(), message.sessionId());
     }
 }

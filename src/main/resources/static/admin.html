@@ -175,6 +175,8 @@
                     <span class="ic" data-i="chart"></span>RAG 评测</div>
                 <div class="nav-item" data-view="feedback" onclick="switchView('feedback')">
                     <span class="ic" data-i="thumb"></span>用户反馈</div>
+                <div class="nav-item" data-view="usage" onclick="switchView('usage')">
+                    <span class="ic" data-i="chart"></span>Token 用量</div>
             </nav>
             <div class="side-foot">
                 <div class="logout" onclick="logout()"><span class="ic" data-i="logout"></span>退出登录</div>
@@ -317,6 +319,30 @@
                         <div id="feedbackBody"></div>
                     </div>
                 </div>
+
+                <!-- Token 用量 -->
+                <div id="view-usage" class="hidden">
+                    <div class="stats">
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>总 Token</div><div class="num" id="tuTotal">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>输入 / 输出</div><div class="num" id="tuIO" style="font-size:20px">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>调用次数</div><div class="num" id="tuCalls">—</div></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="chart"></span>按功能（对话 / 重排 / 记忆 / 评测）</h2>
+                            <button class="btn-ghost" onclick="loadUsage()"><span class="ic" data-i="refresh"></span>刷新</button>
+                        </div>
+                        <div id="usagePurposeBody"></div>
+                    </div>
+                    <div class="panel" style="margin-top:16px">
+                        <div class="panel-head"><h2><span class="ic" data-i="users"></span>按用户（Top）</h2></div>
+                        <div id="usageUserBody"></div>
+                    </div>
+                    <div class="panel" style="margin-top:16px">
+                        <div class="panel-head"><h2><span class="ic" data-i="clock"></span>按天（近 14 天）</h2></div>
+                        <div id="usageDayBody"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -402,10 +428,10 @@
         function authHeader(){ return { 'Authorization':'Basic '+cred() }; }
         function jsonHeader(){ return Object.assign({ 'Content-Type':'application/json' }, authHeader()); }
 
-        const VIEW_TITLES = { alerts:'预警台账', students:'学生管理', chatlogs:'对话台账', kb:'知识库管理', eval:'RAG 评测', feedback:'用户反馈' };
+        const VIEW_TITLES = { alerts:'预警台账', students:'学生管理', chatlogs:'对话台账', kb:'知识库管理', eval:'RAG 评测', feedback:'用户反馈', usage:'Token 用量' };
         function switchView(v){
             document.querySelectorAll('.nav-item').forEach(n=> n.classList.toggle('active', n.dataset.view===v));
-            ['alerts','students','chatlogs','kb','eval','feedback'].forEach(x=>{
+            ['alerts','students','chatlogs','kb','eval','feedback','usage'].forEach(x=>{
                 const el=document.getElementById('view-'+x);
                 if(el) el.classList.toggle('hidden', x!==v);
             });
@@ -415,6 +441,7 @@
             if(v==='chatlogs') loadChatLogs();
             if(v==='eval') loadEval();
             if(v==='feedback') loadFeedback();
+            if(v==='usage') loadUsage();
         }
         function logout(){ sessionStorage.removeItem(KEY); location.href='/index.html'; }
 
@@ -847,6 +874,36 @@
             }
             body.innerHTML='<table><thead><tr><th>时间</th><th>参数快照</th><th>样例</th><th>Hit@topK</th><th>P@topK</th><th>R@candK</th><th>MRR</th></tr></thead><tbody>'+rows+'</tbody></table>';
         }
+
+        // ===== Token 用量 =====
+        const USAGE_PURPOSE_LABELS={CHAT:'对话',RERANK:'检索重排',MEMORY_EXTRACT:'记忆抽取',MEMORY_SUMMARY:'会话摘要',EVAL_GEN:'评测生成',UNKNOWN:'未归类'};
+        async function loadUsage(){
+            try{
+                const r=await fetch('/api/admin/usage/stats',{ headers:authHeader() });
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok) return;
+                renderUsage(await r.json());
+            }catch(e){}
+        }
+        function renderUsage(s){
+            const t=s.total||{};
+            document.getElementById('tuTotal').textContent=fmtNum(t.totalTokens);
+            document.getElementById('tuIO').textContent=fmtNum(t.promptTokens)+' / '+fmtNum(t.completionTokens);
+            document.getElementById('tuCalls').textContent=fmtNum(t.calls);
+            renderUsageTable('usagePurposeBody', s.byPurpose, 'purpose', '功能', v=>USAGE_PURPOSE_LABELS[v]||v);
+            renderUsageTable('usageUserBody', s.byUser, 'userId', '用户', v=>v);
+            renderUsageTable('usageDayBody', s.byDay, 'day', '日期', v=>v);
+        }
+        function renderUsageTable(bodyId, rows, keyName, keyLabel, fmtKey){
+            const body=document.getElementById(bodyId);
+            if(!rows||!rows.length){ body.innerHTML='<div class="empty">暂无数据</div>'; return; }
+            let html='<table><thead><tr><th>'+keyLabel+'</th><th>Token</th><th>调用次数</th></tr></thead><tbody>';
+            for(const r of rows){
+                html+='<tr><td>'+esc(fmtKey(r[keyName]))+'</td><td><b>'+fmtNum(r.totalTokens)+'</b></td><td>'+fmtNum(r.calls)+'</td></tr>';
+            }
+            body.innerHTML=html+'</tbody></table>';
+        }
+        function fmtNum(n){ return Number(n||0).toLocaleString('en-US'); }
 
         // ===== 用户反馈 =====
         async function loadFeedback(){ await Promise.all([loadFbStats(), loadFbList()]); }

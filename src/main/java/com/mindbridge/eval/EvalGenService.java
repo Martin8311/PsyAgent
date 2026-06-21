@@ -2,6 +2,7 @@ package com.mindbridge.eval;
 
 import com.mindbridge.ai.AiClient;
 import com.mindbridge.ai.ChatMessage;
+import com.mindbridge.ai.LlmCallMeta;
 import com.mindbridge.knowledge.KbDocument;
 import com.mindbridge.knowledge.KbDocumentRepository;
 import org.slf4j.Logger;
@@ -69,7 +70,7 @@ public class EvalGenService {
         List<ChatMessage> messages = List.of(
                 ChatMessage.system(systemPrompt),
                 ChatMessage.user(snippet));
-        return aiClient.chat(messages)
+        return aiClient.chat(messages, LlmCallMeta.of(LlmCallMeta.Purpose.EVAL_GEN))
                 .publishOn(Schedulers.boundedElastic())
                 .map(text -> parseAndSave(text, doc, perDoc, scenario))
                 .onErrorResume(e -> {

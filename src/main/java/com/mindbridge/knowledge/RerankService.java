@@ -2,6 +2,7 @@ package com.mindbridge.knowledge;
 
 import com.mindbridge.ai.AiClient;
 import com.mindbridge.ai.ChatMessage;
+import com.mindbridge.ai.LlmCallMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -55,7 +56,8 @@ public class RerankService {
         try {
             String raw = aiClient.chat(List.of(
                     ChatMessage.system("你是检索结果重排助手，只输出编号，不要任何解释。"),
-                    ChatMessage.user(buildPrompt(query, pool, topK)))).block();
+                    ChatMessage.user(buildPrompt(query, pool, topK))),
+                    LlmCallMeta.of(LlmCallMeta.Purpose.RERANK)).block();
             List<Integer> order = parseOrder(raw, n);
             if (order.isEmpty()) {
                 log.warn("LLM 重排未解析到有效编号，回退融合顺序。raw='{}'", abbreviate(raw));
