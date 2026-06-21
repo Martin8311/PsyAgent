@@ -30,4 +30,9 @@ public class AsyncPublisher {
     public void publishGuardianNotify(GuardianNotifyMessage message) {
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.RK_GUARDIAN_NOTIFY, message);
     }
+
+    /** 一轮对话 → 异步抽取用户长期记忆。 */
+    public void publishMemoryExtract(MemoryExtractMessage message) {
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.RK_MEMORY_EXTRACT, message);
+    }
 }

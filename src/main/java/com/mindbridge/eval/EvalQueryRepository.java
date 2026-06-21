@@ -20,4 +20,10 @@ public interface EvalQueryRepository extends JpaRepository<EvalQuery, Long> {
     @Transactional
     @Query("DELETE FROM EvalQuery q WHERE q.expectedDocId = :docId")
     void deleteByExpectedDocId(Long docId);
+
+    /** 清空所有未校正样例(重新生成前清场)，返回删除条数。 */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM EvalQuery q WHERE q.reviewed = false")
+    int deleteByReviewedFalse();
 }

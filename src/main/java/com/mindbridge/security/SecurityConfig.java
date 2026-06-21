@@ -45,8 +45,9 @@ public class SecurityConfig {
                         .pathMatchers("/sse/**", "/mcp/**").permitAll()
                         // 管理员后台
                         .pathMatchers("/api/admin/**").hasRole("ADMIN")
-                        // 聊天 + 会话管理需登录
-                        .pathMatchers("/api/chat", "/api/chat/**", "/api/sessions/**", "/api/feedback").authenticated()
+                        // 聊天 + 会话管理 + 反馈 + 我的记忆 需登录
+                        .pathMatchers("/api/chat", "/api/chat/**", "/api/sessions/**",
+                                "/api/feedback", "/api/memory", "/api/memory/**").authenticated()
                         // 其余一律需要认证
                         .anyExchange().authenticated()
                 )

@@ -240,6 +240,7 @@
                 <div class="sb-user-role" id="sbUserRole"></div>
             </div>
             <button class="icon-btn" id="adminEntryBtn" style="display:none" onclick="location.href='/admin.html'" title="管理后台"><span class="ic" data-i="shield"></span></button>
+            <button class="icon-btn" onclick="openMemory()" title="我的记忆"><span class="ic" data-i="memory"></span></button>
             <button class="icon-btn" onclick="openProfile()" title="个人信息"><span class="ic" data-i="settings"></span></button>
             <button class="icon-btn" onclick="logout()" title="退出"><span class="ic" data-i="logout"></span></button>
         </div>
@@ -279,6 +280,18 @@
     </div>
 </div>
 
+<!-- 我的记忆弹窗 -->
+<div id="memoryModal" class="modal-mask">
+    <div class="modal-card" style="max-width:540px">
+        <h3><span class="ic" data-i="memory"></span>我的记忆</h3>
+        <p class="tip">这些是小桥在过往聊天中记住的、关于你的信息。你可以随时删除任意一条，删了小桥就不再记得。</p>
+        <div id="memoryList" style="max-height:52vh;overflow:auto;margin:4px 0 2px"></div>
+        <div class="modal-actions">
+            <button class="btn-ghost" onclick="closeMemory()">关闭</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const ICONS = {
     heart:'<path d="M12 21c-4.5-3-8-6.5-8-10.5A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 8 2.5C20 14.5 16.5 18 12 21z"/>',
@@ -293,7 +306,8 @@ const ICONS = {
     shield:'<path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/>',
     search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
-    trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>'
+    trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>',
+    memory:'<path d="M4 5a2 2 0 0 1 2-2h11l3 3v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 8h7M8 12h7M8 16h4"/>'
 };
 function svgFor(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||'')+'</svg>'; }
 function paintIcons(root){ (root||document).querySelectorAll('.ic[data-i]').forEach(el=>{ if(!el.dataset.done){ el.innerHTML=svgFor(el.dataset.i); el.dataset.done='1'; } }); }
@@ -659,6 +673,40 @@ function openProfile(){
     $('pfNickname').focus();
 }
 function closeProfile(){ $('profileModal').classList.remove('show'); }
+
+// ===== 我的记忆（长期记忆，隐私可删）=====
+const MEM_KEY_LABELS={family:'家庭',study:'学业',sleep:'睡眠',relationship:'人际',health:'健康',interest:'兴趣',risk:'状态',other:'其他'};
+function openMemory(){ $('memoryModal').classList.add('show'); loadMemory(); }
+function closeMemory(){ $('memoryModal').classList.remove('show'); }
+async function loadMemory(){
+    const box=$('memoryList'); box.innerHTML='<div class="tip" style="padding:14px 0">加载中…</div>';
+    try{
+        const r=await fetch('/api/memory',{ headers:authHeader() });
+        if(r.status===401){ logout(); return; }
+        if(!r.ok){ box.innerHTML='<div class="tip" style="padding:14px 0">加载失败（'+r.status+'）</div>'; return; }
+        renderMemory(await r.json());
+    }catch(e){ box.innerHTML='<div class="tip" style="padding:14px 0">网络错误</div>'; }
+}
+function renderMemory(list){
+    const box=$('memoryList');
+    if(!list.length){ box.innerHTML='<div class="tip" style="padding:14px 0">小桥还没有记住关于你的信息，多聊几句吧～</div>'; return; }
+    let html='';
+    for(const m of list){
+        const tag=m.type==='SUMMARY'?'会话摘要':(MEM_KEY_LABELS[m.memoryKey]||'其他');
+        html+='<div style="display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid rgba(99,102,241,.15);border-radius:10px;margin-bottom:8px">'
+            +'<div style="flex:1;font-size:14px;line-height:1.55"><span style="display:inline-block;font-size:11px;color:var(--primary);background:rgba(99,102,241,.1);padding:1px 7px;border-radius:6px;margin-right:6px">'+tag+'</span>'+esc(m.content)+'</div>'
+            +'<button onclick="deleteMemory('+m.id+')" title="删除这条记忆" style="background:none;border:none;cursor:pointer;color:#c0c0cc;flex-shrink:0;width:26px;height:26px;padding:0"><span class="ic" data-i="trash"></span></button>'
+            +'</div>';
+    }
+    box.innerHTML=html; paintIcons(box);
+}
+async function deleteMemory(id){
+    if(!confirm('删除这条记忆？小桥将不再记得这件事。')) return;
+    try{
+        const r=await fetch('/api/memory/'+id,{ method:'DELETE', headers:authHeader() });
+        if(r.ok) loadMemory();
+    }catch(e){}
+}
 async function saveProfile(){
     const nick=$('pfNickname').value.trim();
     if(!nick){ $('pfMsg').textContent='昵称不能为空'; $('pfMsg').className='msg err'; return; }

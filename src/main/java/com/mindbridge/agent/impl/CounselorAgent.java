@@ -77,6 +77,13 @@ public class CounselorAgent implements Agent {
                 messages.add(ChatMessage.system("可参考的心理知识资料：\n" + knowledge));
             }
 
+            // 注入长期记忆（跨会话用户画像），让回复延续过往的了解与关系
+            if (!context.getLongMemory().isEmpty()) {
+                String mem = String.join("\n", context.getLongMemory());
+                messages.add(ChatMessage.system("关于这位同学，你在过往交流中已了解(仅供参考，"
+                        + "请自然地体现关心与连续性，不要生硬复述这些条目)：\n" + mem));
+            }
+
             messages.addAll(context.getHistory());
             messages.add(ChatMessage.user(context.getUserInput()));
             context.setResponseStream(aiClient.streamChat(messages));

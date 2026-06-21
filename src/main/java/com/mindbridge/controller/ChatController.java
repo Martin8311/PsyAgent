@@ -5,6 +5,7 @@ import com.mindbridge.agent.AgentRuntimeService;
 import com.mindbridge.ai.ChatMessage;
 import com.mindbridge.async.AsyncPublisher;
 import com.mindbridge.async.ChatLogMessage;
+import com.mindbridge.async.MemoryExtractMessage;
 import com.mindbridge.eval.FeedbackService;
 import com.mindbridge.memory.ChatMemoryService;
 import com.mindbridge.session.SessionService;
@@ -85,6 +86,11 @@ public class ChatController {
                             .subscribe();
                     // 暂存本次检索命中的文档, 供学生反馈时关联(分析知识盲区)
                     feedbackService.rememberRetrievedDocs(sessionId, context.getRetrievedDocIds()).subscribe();
+                    // 异步抽取长期记忆(fire-and-forget, 失败不影响对话)
+                    Mono.fromRunnable(() -> asyncPublisher.publishMemoryExtract(new MemoryExtractMessage(
+                                    userId, sessionId, message, aiReply, Instant.now())))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .subscribe();
                 });
     }
 }

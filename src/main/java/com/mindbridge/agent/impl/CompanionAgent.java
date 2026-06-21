@@ -49,6 +49,12 @@ public class CompanionAgent implements Agent {
         return Mono.fromRunnable(() -> {
             List<ChatMessage> messages = new ArrayList<>();
             messages.add(ChatMessage.system(SYSTEM_PROMPT));
+            // 注入长期记忆（跨会话用户画像），让陪伴更连续、更懂这个人
+            if (!context.getLongMemory().isEmpty()) {
+                String mem = String.join("\n", context.getLongMemory());
+                messages.add(ChatMessage.system("关于这位同学，你在过往交流中已了解(仅供参考，"
+                        + "请自然地体现关心，不要生硬复述这些条目)：\n" + mem));
+            }
             messages.addAll(context.getHistory());
             messages.add(ChatMessage.user(context.getUserInput()));
             context.setResponseStream(aiClient.streamChat(messages));

@@ -26,6 +26,10 @@ public class AgentContext {
     private final List<ChatMessage> history = new ArrayList<>();
     private boolean memoryLoaded = false;
 
+    /** 长期记忆(跨会话召回的用户画像/摘要)，注入回复 prompt 让 AI 记得这个人。 */
+    private final List<String> longMemory = new ArrayList<>();
+    private boolean longMemoryLoaded = false;
+
     // ===== 意图路由 =====
     private Intent intent;
 
@@ -64,6 +68,18 @@ public class AgentContext {
 
     public void setMemoryLoaded(boolean memoryLoaded) {
         this.memoryLoaded = memoryLoaded;
+    }
+
+    public List<String> getLongMemory() {
+        return longMemory;
+    }
+
+    public boolean isLongMemoryLoaded() {
+        return longMemoryLoaded;
+    }
+
+    public void setLongMemoryLoaded(boolean longMemoryLoaded) {
+        this.longMemoryLoaded = longMemoryLoaded;
     }
 
     public Intent getIntent() {

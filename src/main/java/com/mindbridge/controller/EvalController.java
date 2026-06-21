@@ -47,10 +47,11 @@ public class EvalController {
         this.resultRepo = resultRepo;
     }
 
-    /** LLM 为每篇文档生成 perDoc 个评测问题。 */
+    /** LLM 为每篇文档生成 perDoc 个评测问题。style: factual(事实型) / scenario(场景型口语化)。 */
     @PostMapping("/generate")
-    public Mono<Map<String, Object>> generate(@RequestParam(defaultValue = "3") int perDoc) {
-        return genService.generate(perDoc).map(n -> Map.of("generated", n));
+    public Mono<Map<String, Object>> generate(@RequestParam(defaultValue = "3") int perDoc,
+                                              @RequestParam(defaultValue = "factual") String style) {
+        return genService.generate(perDoc, style).map(n -> Map.of("generated", n));
     }
 
     /** 评测集列表。 */
@@ -89,6 +90,13 @@ public class EvalController {
             queryRepo.deleteById(id);
             return Map.<String, Object>of("deleted", id);
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 清空所有未校正样例(重新生成前清场)。 */
+    @DeleteMapping("/queries/unreviewed")
+    public Mono<Map<String, Object>> clearUnreviewed() {
+        return Mono.fromCallable(() -> Map.<String, Object>of("deleted", queryRepo.deleteByReviewedFalse()))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     /** 跑一次评测。 */

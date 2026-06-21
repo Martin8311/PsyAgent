@@ -33,10 +33,12 @@ public class RabbitConfig {
     public static final String Q_CHAT_LOG = "mindbridge.q.chat.log";
     public static final String Q_RISK_ALERT = "mindbridge.q.risk.alert";
     public static final String Q_GUARDIAN_NOTIFY = "mindbridge.q.guardian.notify";
+    public static final String Q_MEMORY_EXTRACT = "mindbridge.q.memory.extract";
 
     public static final String RK_CHAT_LOG = "chat.log";
     public static final String RK_RISK_ALERT = "risk.alert";
     public static final String RK_GUARDIAN_NOTIFY = "guardian.notify";
+    public static final String RK_MEMORY_EXTRACT = "memory.extract";
 
     @Bean
     public TopicExchange asyncExchange() {
@@ -71,6 +73,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue memoryExtractQueue() {
+        return durableWithDlx(Q_MEMORY_EXTRACT);
+    }
+
+    @Bean
     public Queue chatLogDlq() {
         return QueueBuilder.durable(Q_CHAT_LOG + ".dlq").build();
     }
@@ -86,6 +93,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue memoryExtractDlq() {
+        return QueueBuilder.durable(Q_MEMORY_EXTRACT + ".dlq").build();
+    }
+
+    @Bean
     public Binding bindChatLog() {
         return BindingBuilder.bind(chatLogQueue()).to(asyncExchange()).with(RK_CHAT_LOG);
     }
@@ -98,6 +110,16 @@ public class RabbitConfig {
     @Bean
     public Binding bindGuardianNotify() {
         return BindingBuilder.bind(guardianNotifyQueue()).to(asyncExchange()).with(RK_GUARDIAN_NOTIFY);
+    }
+
+    @Bean
+    public Binding bindMemoryExtract() {
+        return BindingBuilder.bind(memoryExtractQueue()).to(asyncExchange()).with(RK_MEMORY_EXTRACT);
+    }
+
+    @Bean
+    public Binding bindMemoryExtractDlq() {
+        return BindingBuilder.bind(memoryExtractDlq()).to(deadLetterExchange()).with(Q_MEMORY_EXTRACT + ".dlq");
     }
 
     @Bean
