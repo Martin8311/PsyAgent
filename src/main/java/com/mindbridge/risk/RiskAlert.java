@@ -45,6 +45,18 @@ public class RiskAlert {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** 处置状态：待核实 / 已通知监护人 / 已忽略。 */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AlertStatus status = AlertStatus.PENDING_REVIEW;
+
+    /** 通知监护人的时间（第二跳完成后写入）。 */
+    private Instant notifiedAt;
+
+    /** 处置人（管理员用户名）。 */
+    @Column(length = 64)
+    private String handledBy;
+
     protected RiskAlert() {
     }
 
@@ -83,5 +95,30 @@ public class RiskAlert {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    /** 兜底：历史数据 status 列可能为 null，按待核实处理。 */
+    public AlertStatus getStatus() {
+        return status == null ? AlertStatus.PENDING_REVIEW : status;
+    }
+
+    public void setStatus(AlertStatus status) {
+        this.status = status;
+    }
+
+    public Instant getNotifiedAt() {
+        return notifiedAt;
+    }
+
+    public void setNotifiedAt(Instant notifiedAt) {
+        this.notifiedAt = notifiedAt;
+    }
+
+    public String getHandledBy() {
+        return handledBy;
+    }
+
+    public void setHandledBy(String handledBy) {
+        this.handledBy = handledBy;
     }
 }

@@ -77,6 +77,31 @@
             <artifactId>spring-ai-starter-vector-store-chroma</artifactId>
         </dependency>
 
+        <!-- RabbitMQ: 异步任务(写Excel台账 / 发预警邮件) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- 邮件: QQ SMTP 高危预警 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Apache POI: 对话台账写 xlsx -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.3.0</version>
+        </dependency>
+
+        <!-- MCP Server (WebFlux SSE): 把写台账/发邮件暴露为标准 MCP 工具 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webflux</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

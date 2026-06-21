@@ -132,6 +132,26 @@
         .modal-body{ flex:1; overflow-y:auto; padding:20px 24px; }
         .modal-body pre{ margin:0; white-space:pre-wrap; word-break:break-word; font-family:"Microsoft YaHei",system-ui,sans-serif;
             font-size:14px; line-height:1.8; color:var(--ink); }
+        /* 预警操作按钮 / 状态徽标 / 表单 */
+        .btn-notify{ display:inline-flex; align-items:center; gap:5px; color:#c4561d; background:rgba(216,90,48,.1);
+            border:1px solid rgba(216,90,48,.25); padding:5px 11px; border-radius:9px; cursor:pointer; font-size:12px; font-family:inherit; margin-right:4px; }
+        .btn-notify:hover{ background:rgba(216,90,48,.2); }
+        .btn-dismiss{ display:inline-flex; align-items:center; gap:5px; color:#6b7280; background:rgba(107,114,128,.1);
+            border:1px solid rgba(107,114,128,.22); padding:5px 11px; border-radius:9px; cursor:pointer; font-size:12px; font-family:inherit; }
+        .btn-dismiss:hover{ background:rgba(107,114,128,.2); }
+        .btn-dl{ display:inline-flex; align-items:center; gap:5px; color:#185fa5; background:rgba(55,138,221,.1);
+            border:1px solid rgba(55,138,221,.25); padding:5px 11px; border-radius:9px; cursor:pointer; font-size:12px; font-family:inherit; }
+        .btn-dl:hover{ background:rgba(55,138,221,.2); }
+        .st-PENDING_REVIEW{ background:#fdf0db; color:#9a6111; }
+        .st-GUARDIAN_NOTIFIED{ background:#e3f6ec; color:#0f7a52; }
+        .st-DISMISSED{ background:#eceaf3; color:#6b7280; }
+        .form-row{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+        .form-row label{ font-size:13px; color:var(--muted); }
+        .form-row input,.form-row textarea{ padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+            font-family:inherit; font-size:14px; width:100%; resize:vertical; }
+        .btn-primary{ width:100%; padding:11px; border:none; border-radius:11px; color:#fff; font-size:14px; font-family:inherit; cursor:pointer;
+            background:linear-gradient(135deg,var(--primary),var(--primary-2)); }
+        .btn-primary:hover{ opacity:.92; }
     </style>
 </head>
 <body>
@@ -145,6 +165,10 @@
             <nav class="nav">
                 <div class="nav-item active" data-view="alerts" onclick="switchView('alerts')">
                     <span class="ic" data-i="alert"></span>预警台账</div>
+                <div class="nav-item" data-view="students" onclick="switchView('students')">
+                    <span class="ic" data-i="users"></span>学生管理</div>
+                <div class="nav-item" data-view="chatlogs" onclick="switchView('chatlogs')">
+                    <span class="ic" data-i="sheet"></span>对话台账</div>
                 <div class="nav-item" data-view="kb" onclick="switchView('kb')">
                     <span class="ic" data-i="book"></span>知识库管理</div>
             </nav>
@@ -199,6 +223,31 @@
                         <div id="kbDocsBody"></div>
                     </div>
                 </div>
+
+                <!-- 学生管理 -->
+                <div id="view-students" class="hidden">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="users"></span>学生与监护人</h2>
+                            <div style="display:flex;gap:8px">
+                                <button class="btn-ghost" onclick="openImport()"><span class="ic" data-i="upload"></span>批量导入</button>
+                                <button class="btn-ghost" onclick="loadStudents()"><span class="ic" data-i="refresh"></span>刷新</button>
+                            </div>
+                        </div>
+                        <div id="studentsBody"></div>
+                    </div>
+                </div>
+
+                <!-- 对话台账 -->
+                <div id="view-chatlogs" class="hidden">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="sheet"></span>对话台账（按 用户+会话 分文件）</h2>
+                            <button class="btn-ghost" onclick="loadChatLogs()"><span class="ic" data-i="refresh"></span>刷新</button>
+                        </div>
+                        <div id="chatlogsBody"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -211,6 +260,42 @@
                 <button class="modal-close" onclick="hideModal()">×</button>
             </div>
             <div class="modal-body"><pre id="previewContent">加载中…</pre></div>
+        </div>
+    </div>
+
+    <!-- 设定监护人弹窗 -->
+    <div class="modal-overlay" id="guardianModal" style="display:none" onclick="closeGuardian(event)">
+        <div class="modal-box" style="width:min(440px,92vw)">
+            <div class="modal-head">
+                <h3>设定监护人</h3>
+                <button class="modal-close" onclick="hideGuardian()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row"><label>学生</label><input id="gStudent" disabled></div>
+                <div class="form-row"><label>监护人姓名</label><input id="gName" placeholder="如：张父"></div>
+                <div class="form-row"><label>监护人邮箱</label><input id="gEmail" placeholder="guardian@example.com"></div>
+                <div class="form-row"><label>监护人电话（可选）</label><input id="gPhone" placeholder="13800000000"></div>
+                <div id="gMsg" class="kb-msg hidden"></div>
+                <button class="btn-primary" onclick="saveGuardian()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量导入监护人弹窗 -->
+    <div class="modal-overlay" id="importModal" style="display:none" onclick="closeImport(event)">
+        <div class="modal-box" style="width:min(520px,92vw)">
+            <div class="modal-head">
+                <h3>批量导入监护人（CSV）</h3>
+                <button class="modal-close" onclick="hideImport()">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="emo" style="margin-top:0">每行格式：<b>用户名,监护人姓名,监护人邮箱,电话</b>（电话可省略）。首行表头自动跳过。</p>
+                <div class="form-row">
+                    <textarea id="csvText" rows="8" placeholder="student,张父,zhang@qq.com,13800000000&#10;bob,李母,li@qq.com"></textarea>
+                </div>
+                <div id="impMsg" class="kb-msg hidden"></div>
+                <button class="btn-primary" onclick="doImport()">导入</button>
+            </div>
         </div>
     </div>
 
@@ -233,7 +318,10 @@
             refresh:'<path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/><path d="M17 3v5h-5M7 21v-5h5"/>',
             upload:'<path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
             lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-            trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>'
+            trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>',
+            users:'<path d="M16 21v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7" r="3"/><path d="M22 21v-1a4 4 0 0 0-3-3.85"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+            sheet:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>',
+            download:'<path d="M12 4v12M8 12l4 4 4-4"/><path d="M4 20h16"/>'
         };
         function svgFor(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||'')+'</svg>'; }
         function paintIcons(){ document.querySelectorAll('.ic[data-i]').forEach(el=>{ if(!el.dataset.done){ el.innerHTML=svgFor(el.dataset.i); el.dataset.done='1'; } }); }
@@ -241,14 +329,19 @@
         const KEY='mb_cred';
         function cred(){ return sessionStorage.getItem(KEY); }
         function authHeader(){ return { 'Authorization':'Basic '+cred() }; }
+        function jsonHeader(){ return Object.assign({ 'Content-Type':'application/json' }, authHeader()); }
 
-        const VIEW_TITLES = { alerts:'预警台账', kb:'知识库管理' };
+        const VIEW_TITLES = { alerts:'预警台账', students:'学生管理', chatlogs:'对话台账', kb:'知识库管理' };
         function switchView(v){
             document.querySelectorAll('.nav-item').forEach(n=> n.classList.toggle('active', n.dataset.view===v));
-            document.getElementById('view-alerts').classList.toggle('hidden', v!=='alerts');
-            document.getElementById('view-kb').classList.toggle('hidden', v!=='kb');
+            ['alerts','students','chatlogs','kb'].forEach(x=>{
+                const el=document.getElementById('view-'+x);
+                if(el) el.classList.toggle('hidden', x!==v);
+            });
             document.getElementById('viewTitle').textContent = VIEW_TITLES[v];
             if(v==='kb') loadKbDocs();
+            if(v==='students') loadStudents();
+            if(v==='chatlogs') loadChatLogs();
         }
         function logout(){ sessionStorage.removeItem(KEY); location.href='/index.html'; }
 
@@ -381,20 +474,28 @@
                 body.innerHTML = '<div class="empty"><span class="ic" data-i="shield"></span>暂无预警记录，一切平安</div>';
                 paintIcons(); return;
             }
+            const ST_LABEL = { PENDING_REVIEW:'待核实', GUARDIAN_NOTIFIED:'已通知监护人', DISMISSED:'已忽略' };
             let rows = '';
             for(const a of list){
                 const t = new Date(a.createdAt).toLocaleString('zh-CN');
+                let actions;
+                if(a.status==='PENDING_REVIEW'){
+                    actions = '<button class="btn-notify" onclick="notifyGuardian('+a.id+')">通知监护人</button>'
+                            + '<button class="btn-dismiss" onclick="dismissAlert('+a.id+')">误报</button>';
+                } else {
+                    actions = '<span class="emo">'+(a.handledBy?('@'+esc(a.handledBy)):'—')+'</span>';
+                }
                 rows += '<tr>'
                     + '<td style="white-space:nowrap;color:#6b7280">'+esc(t)+'</td>'
                     + '<td><b>'+esc(a.userId)+'</b></td>'
                     + '<td><span class="badge lv-'+a.level+'">'+a.level+'</span></td>'
-                    + '<td class="emo">'+esc(a.emotion)+'</td>'
                     + '<td class="msg-cell">'+esc(a.userMessage)+'</td>'
-                    + '<td class="emo">'+esc(a.reason)+'</td>'
+                    + '<td><span class="badge st-'+a.status+'">'+(ST_LABEL[a.status]||a.status)+'</span></td>'
+                    + '<td style="white-space:nowrap">'+actions+'</td>'
                     + '</tr>';
             }
             body.innerHTML = '<table><thead><tr>'
-                + '<th>时间</th><th>学生</th><th>风险等级</th><th>情绪</th><th>原话</th><th>研判理由</th>'
+                + '<th>时间</th><th>学生</th><th>等级</th><th>原话</th><th>状态</th><th>操作</th>'
                 + '</tr></thead><tbody>'+rows+'</tbody></table>';
         }
 
@@ -406,6 +507,128 @@
                 if(!r.ok){ document.getElementById('alertsBody').innerHTML='<div class="empty">加载失败('+r.status+')</div>'; return; }
                 renderAlerts(await r.json());
             } catch(e){ document.getElementById('alertsBody').innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+
+        // ===== 预警处置（两段式第二跳） =====
+        async function notifyGuardian(id){
+            if(!confirm('确认该预警属实，立即邮件通知该生监护人？')) return;
+            try{
+                const r=await fetch('/api/admin/alerts/'+id+'/notify-guardian',{ method:'POST', headers:authHeader() });
+                if(r.ok){ loadAlerts(); }
+                else{ let m=''; try{ m=(await r.json()).message||''; }catch(_){}; alert('操作失败（'+r.status+'）'+(m?'：'+m:'')); }
+            }catch(e){ alert('网络错误：'+e.message); }
+        }
+        async function dismissAlert(id){
+            if(!confirm('标记为误报并忽略？不会通知监护人。')) return;
+            try{
+                const r=await fetch('/api/admin/alerts/'+id+'/dismiss',{ method:'POST', headers:authHeader() });
+                if(r.ok){ loadAlerts(); } else{ alert('操作失败（'+r.status+'）'); }
+            }catch(e){ alert('网络错误：'+e.message); }
+        }
+
+        // ===== 学生 / 监护人管理 =====
+        const studentsCache={};
+        let curGuardianId=null;
+        async function loadStudents(){
+            const body=document.getElementById('studentsBody');
+            body.innerHTML='<div class="empty">加载中…</div>';
+            try{
+                const r=await fetch('/api/admin/students',{ headers:authHeader() });
+                if(r.status===401){ location.href='/index.html'; return; }
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok){ body.innerHTML='<div class="empty">加载失败（'+r.status+'）</div>'; return; }
+                renderStudents(await r.json());
+            }catch(e){ body.innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+        function renderStudents(list){
+            const body=document.getElementById('studentsBody');
+            if(!list.length){ body.innerHTML='<div class="empty">暂无学生</div>'; return; }
+            let rows='';
+            for(const s of list){
+                studentsCache[s.id]=s;
+                const has=s.guardianEmail && s.guardianEmail.length;
+                rows+='<tr>'
+                    +'<td><b>'+esc(s.nickname)+'</b><div class="emo">'+esc(s.username)+'</div></td>'
+                    +'<td>'+(s.guardianName?esc(s.guardianName):'<span class="emo">—</span>')+'</td>'
+                    +'<td>'+(has?esc(s.guardianEmail):'<span class="badge st-DISMISSED">未设定</span>')+'</td>'
+                    +'<td class="emo">'+(s.guardianPhone?esc(s.guardianPhone):'—')+'</td>'
+                    +'<td><button class="btn-preview" onclick="openGuardian('+s.id+')">设定监护人</button></td>'
+                    +'</tr>';
+            }
+            body.innerHTML='<table><thead><tr>'
+                +'<th>学生</th><th>监护人</th><th>监护人邮箱</th><th>电话</th><th>操作</th>'
+                +'</tr></thead><tbody>'+rows+'</tbody></table>';
+        }
+        function openGuardian(id){
+            const s=studentsCache[id]; if(!s) return;
+            curGuardianId=id;
+            document.getElementById('gStudent').value=s.nickname+'（'+s.username+'）';
+            document.getElementById('gName').value=s.guardianName||'';
+            document.getElementById('gEmail').value=s.guardianEmail||'';
+            document.getElementById('gPhone').value=s.guardianPhone||'';
+            document.getElementById('gMsg').classList.add('hidden');
+            document.getElementById('guardianModal').style.display='flex';
+        }
+        function hideGuardian(){ document.getElementById('guardianModal').style.display='none'; }
+        function closeGuardian(e){ if(e.target.id==='guardianModal') hideGuardian(); }
+        async function saveGuardian(){
+            const body={ guardianName:document.getElementById('gName').value.trim(),
+                guardianEmail:document.getElementById('gEmail').value.trim(),
+                guardianPhone:document.getElementById('gPhone').value.trim() };
+            const m=document.getElementById('gMsg');
+            try{
+                const r=await fetch('/api/admin/students/'+curGuardianId+'/guardian',{ method:'PUT', headers:jsonHeader(), body:JSON.stringify(body) });
+                if(r.ok){ hideGuardian(); loadStudents(); }
+                else{ m.classList.remove('hidden'); m.className='kb-msg err'; m.textContent='保存失败（'+r.status+'）'; }
+            }catch(e){ m.classList.remove('hidden'); m.className='kb-msg err'; m.textContent='网络错误：'+e.message; }
+        }
+        function openImport(){ document.getElementById('csvText').value=''; document.getElementById('impMsg').classList.add('hidden'); document.getElementById('importModal').style.display='flex'; }
+        function hideImport(){ document.getElementById('importModal').style.display='none'; }
+        function closeImport(e){ if(e.target.id==='importModal') hideImport(); }
+        async function doImport(){
+            const csv=document.getElementById('csvText').value;
+            const m=document.getElementById('impMsg');
+            try{
+                const r=await fetch('/api/admin/students/import',{ method:'POST', headers:jsonHeader(), body:JSON.stringify({ csv:csv }) });
+                if(r.ok){ const d=await r.json(); m.classList.remove('hidden'); m.className='kb-msg ok'; m.textContent='✓ 已更新 '+d.updated+' 名学生的监护人'; loadStudents(); }
+                else{ m.classList.remove('hidden'); m.className='kb-msg err'; m.textContent='导入失败（'+r.status+'）'; }
+            }catch(e){ m.classList.remove('hidden'); m.className='kb-msg err'; m.textContent='网络错误：'+e.message; }
+        }
+
+        // ===== 对话台账下载 =====
+        let chatLogsCache=[];
+        async function loadChatLogs(){
+            const body=document.getElementById('chatlogsBody');
+            body.innerHTML='<div class="empty">加载中…</div>';
+            try{
+                const r=await fetch('/api/admin/chat-logs',{ headers:authHeader() });
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok){ body.innerHTML='<div class="empty">加载失败（'+r.status+'）</div>'; return; }
+                renderChatLogs(await r.json());
+            }catch(e){ body.innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+        function renderChatLogs(files){
+            chatLogsCache=files;
+            const body=document.getElementById('chatlogsBody');
+            if(!files.length){ body.innerHTML='<div class="empty"><span class="ic" data-i="sheet"></span>还没有对话台账，学生聊天后自动生成</div>'; paintIcons(); return; }
+            let rows='';
+            for(let i=0;i<files.length;i++){
+                rows+='<tr><td><b>'+esc(files[i])+'</b></td>'
+                    +'<td><button class="btn-dl" onclick="downloadLog('+i+')"><span class="ic" data-i="download"></span>下载</button></td></tr>';
+            }
+            body.innerHTML='<table><thead><tr><th>台账文件</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
+            paintIcons();
+        }
+        async function downloadLog(i){
+            const file=chatLogsCache[i]; if(!file) return;
+            try{
+                const r=await fetch('/api/admin/chat-logs/download?file='+encodeURIComponent(file),{ headers:authHeader() });
+                if(!r.ok){ alert('下载失败（'+r.status+'）'); return; }
+                const blob=await r.blob();
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement('a'); a.href=url; a.download=file; a.click();
+                URL.revokeObjectURL(url);
+            }catch(e){ alert('网络错误：'+e.message); }
         }
 
         function showBlocker(msg){

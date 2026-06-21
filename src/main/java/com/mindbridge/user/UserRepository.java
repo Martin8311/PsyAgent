@@ -2,6 +2,7 @@ package com.mindbridge.user;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -13,4 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
     boolean existsByUsername(String username);
+
+    /** 按角色列出用户（管理员后台学生管理用）。 */
+    List<User> findByRoleOrderByCreatedAtDesc(Role role);
 }

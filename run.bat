@@ -1,25 +1,29 @@
 @echo off
-rem MindBridge - one-click start (command line)
-rem Requires env vars: MYSQL_PASSWORD, REDIS_PASSWORD
+rem MindBridge one-click start. Credentials are loaded from env-local.bat (gitignored).
 setlocal
 set JAVA_HOME=D:\java17
 cd /d %~dp0
 
+rem Load local secrets (MySQL/Redis/RabbitMQ/QQ mail)
+if exist "%~dp0env-local.bat" call "%~dp0env-local.bat"
+
 if "%MYSQL_PASSWORD%"=="" (
-  echo [ERROR] MYSQL_PASSWORD is not set.
-  echo   Set it for this window:   set MYSQL_PASSWORD=your_mysql_password
-  echo   Or set it permanently:    setx MYSQL_PASSWORD "your_mysql_password"
+  echo [ERROR] MYSQL_PASSWORD is not set. Configure it in env-local.bat
   goto :end
 )
 if "%REDIS_PASSWORD%"=="" (
-  echo [ERROR] REDIS_PASSWORD is not set.
-  echo   Set it for this window:   set REDIS_PASSWORD=your_redis_password
-  echo   Or set it permanently:    setx REDIS_PASSWORD "your_redis_password"
+  echo [ERROR] REDIS_PASSWORD is not set. Configure it in env-local.bat
   goto :end
 )
+if "%MAIL_USERNAME%"=="" (
+  echo [WARN] MAIL_USERNAME not set - email alerts disabled, app still starts. See env-local.bat
+)
+
+rem Ensure RabbitMQ container is up (ignored if already running)
+docker start poker-rabbitmq >nul 2>&1
 
 echo [MindBridge] JAVA_HOME=%JAVA_HOME%
 echo [MindBridge] starting Spring Boot at http://localhost:8080 ...
-call mvnw.cmd spring-boot:run
+call "%~dp0mvnw.cmd" spring-boot:run
 :end
 endlocal

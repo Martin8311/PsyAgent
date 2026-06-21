@@ -41,6 +41,8 @@ public class SecurityConfig {
                         .pathMatchers("/", "/*.html", "/favicon.ico",
                                 "/css/**", "/js/**", "/actuator/health").permitAll()
                         .pathMatchers("/api/auth/register").permitAll()
+                        // MCP Server SSE 端点(本地开发放行; 生产应改为 token 鉴权)
+                        .pathMatchers("/sse/**", "/mcp/**").permitAll()
                         // 管理员后台
                         .pathMatchers("/api/admin/**").hasRole("ADMIN")
                         // 聊天 + 会话管理需登录

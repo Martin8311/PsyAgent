@@ -29,12 +29,46 @@ spring:
       # 密码走环境变量 REDIS_PASSWORD，不写入代码库
       password: ${REDIS_PASSWORD}
 
+  # ===== RabbitMQ (异步任务: 写Excel台账 / 发预警邮件) =====
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # 独立 vhost, 与同实例其他应用隔离
+    virtual-host: mindbridge
+    listener:
+      simple:
+        # 消费失败不重新入队; 重试耗尽后转入死信队列(DLQ)
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000ms
+
+  # ===== 邮件 (QQ SMTP, 高危预警) =====
+  mail:
+    host: smtp.qq.com
+    port: 465
+    # 缺省留空, 保证未配邮箱也能启动(发邮件时才需要真实值)
+    username: ${MAIL_USERNAME:}
+    # 授权码走环境变量, 不写入代码库
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.ssl.enable: true
+      mail.smtp.auth: true
+
   # ===== Spring AI (RAG: Ollama embedding + Chroma 向量库) =====
   ai:
     # 聊天仍由我们手写的 OllamaAiClient 负责；这里只启用 embedding，关掉 Spring AI 的 chat 自动配置
     model:
       chat: none
       embedding: ollama
+    # MCP Server: 暴露写台账/发邮件/查预警为标准 MCP 工具 (SSE 端点 /sse)
+    mcp:
+      server:
+        name: mindbridge-tools
+        version: 1.0.0
     ollama:
       base-url: http://localhost:11434
       embedding:
@@ -67,6 +101,12 @@ mindbridge:
     # 文本切块：每块约 400 字，相邻块重叠 80 字以保留上下文
     chunk-size: 400
     chunk-overlap: 80
+  # ===== 异步对话台账 (按 用户+会话 分文件) =====
+  excel:
+    dir: ./data/chat-logs
+  # ===== 高危预警邮件收件人 (管理员/心理老师, 逗号分隔) =====
+  mail:
+    admin-recipients: ${ADMIN_MAIL:}
 
 logging:
   level:

@@ -43,6 +43,18 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    /** 监护人姓名（管理员后台设定，高危第二跳通知用）。 */
+    @Column(length = 64)
+    private String guardianName;
+
+    /** 监护人邮箱。 */
+    @Column(length = 128)
+    private String guardianEmail;
+
+    /** 监护人电话（备用）。 */
+    @Column(length = 32)
+    private String guardianPhone;
+
     protected User() {
         // JPA 需要的无参构造
     }
@@ -104,5 +116,29 @@ public class User {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getGuardianName() {
+        return guardianName;
+    }
+
+    public void setGuardianName(String guardianName) {
+        this.guardianName = guardianName;
+    }
+
+    public String getGuardianEmail() {
+        return guardianEmail;
+    }
+
+    public void setGuardianEmail(String guardianEmail) {
+        this.guardianEmail = guardianEmail;
+    }
+
+    public String getGuardianPhone() {
+        return guardianPhone;
+    }
+
+    public void setGuardianPhone(String guardianPhone) {
+        this.guardianPhone = guardianPhone;
     }
 }
