@@ -4,6 +4,7 @@ import com.mindbridge.agent.Agent;
 import com.mindbridge.agent.AgentContext;
 import com.mindbridge.agent.Intent;
 import com.mindbridge.knowledge.KnowledgeBaseService;
+import com.mindbridge.knowledge.RetrievedChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -49,15 +50,20 @@ public class KnowledgeAgent implements Agent {
 
     @Override
     public Mono<Void> act(AgentContext context) {
-        return knowledgeBaseService.search(context.getUserInput())
+        return knowledgeBaseService.searchWithMeta(context.getUserInput())
                 .onErrorResume(e -> {
                     log.warn("知识检索失败，跳过 RAG（不影响后续回复）: {}", e.toString());
-                    return Mono.just(List.of());
+                    return Mono.just(List.<RetrievedChunk>of());
                 })
-                .doOnNext(snippets -> {
-                    context.getKnowledgeSnippets().addAll(snippets);
+                .doOnNext(chunks -> {
+                    chunks.forEach(c -> {
+                        context.getKnowledgeSnippets().add(c.text());
+                        if (c.documentId() != null) {
+                            context.getRetrievedDocIds().add(c.documentId());
+                        }
+                    });
                     context.setKnowledgeRetrieved(true);
-                    context.trace("knowledge", "retrieved " + snippets.size() + " snippets");
+                    context.trace("knowledge", "retrieved " + chunks.size() + " snippets");
                 })
                 .then();
     }

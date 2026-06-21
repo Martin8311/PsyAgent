@@ -143,6 +143,27 @@
         .bubble{ max-width:72%; padding:12px 16px; border-radius:16px; font-size:15px; line-height:1.65; white-space:pre-wrap; word-break:break-word; }
         .bubble.ai{ background:var(--glass-strong); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.6); border-bottom-left-radius:5px; box-shadow:0 4px 16px -8px rgba(80,70,180,.2); }
         .bubble.me{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border-bottom-right-radius:5px; box-shadow:0 8px 20px -8px rgba(99,102,241,.5); }
+        /* Markdown 渲染样式(AI 气泡) */
+        .bubble.md{ white-space:normal; }
+        .bubble.md>*:first-child{ margin-top:0; }
+        .bubble.md>*:last-child{ margin-bottom:0; }
+        .bubble.md p{ margin:0 0 8px; }
+        .bubble.md h1,.bubble.md h2,.bubble.md h3,.bubble.md h4{ margin:12px 0 6px; font-weight:700; line-height:1.3; }
+        .bubble.md h1{ font-size:18px; } .bubble.md h2{ font-size:17px; } .bubble.md h3{ font-size:16px; } .bubble.md h4{ font-size:15px; }
+        .bubble.md ul,.bubble.md ol{ margin:4px 0 8px; padding-left:22px; }
+        .bubble.md li{ margin:3px 0; }
+        .bubble.md code{ background:rgba(99,102,241,.1); padding:1px 5px; border-radius:5px; font-family:'Consolas','Monaco',monospace; font-size:13px; }
+        .bubble.md pre{ background:rgba(30,27,75,.06); border:1px solid rgba(99,102,241,.15); border-radius:10px; padding:10px 12px; overflow-x:auto; margin:6px 0; }
+        .bubble.md pre code{ background:none; padding:0; font-size:13px; line-height:1.5; display:block; }
+        .bubble.md blockquote{ border-left:3px solid var(--primary); margin:6px 0; padding:2px 0 2px 12px; color:#555; }
+        .bubble.md a{ color:var(--primary); text-decoration:underline; }
+        .bubble.md strong{ font-weight:700; } .bubble.md em{ font-style:italic; }
+        .bubble.md hr{ border:none; border-top:1px solid rgba(99,102,241,.2); margin:8px 0; }
+        .fb-bar{ margin:1px 0 10px 50px; display:flex; align-items:center; gap:8px; }
+        .fb-q{ font-size:12px; color:var(--muted); }
+        .fb-btn{ background:rgba(255,255,255,.6); border:1px solid rgba(99,102,241,.16); border-radius:8px; cursor:pointer; font-size:14px; padding:2px 9px; line-height:1.5; }
+        .fb-btn:hover{ background:rgba(99,102,241,.12); }
+        .fb-done{ font-size:12px; color:#0f7a52; }
         .welcome{ text-align:center; margin:auto; color:var(--muted); font-size:14px; line-height:1.8; }
         .welcome .ic{ font-size:40px; color:#c7c5e0; display:block; width:40px; margin:0 auto 12px; }
         .inputbar{ display:flex; gap:10px; padding:12px;
@@ -277,6 +298,48 @@ const ICONS = {
 function svgFor(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||'')+'</svg>'; }
 function paintIcons(root){ (root||document).querySelectorAll('.ic[data-i]').forEach(el=>{ if(!el.dataset.done){ el.innerHTML=svgFor(el.dataset.i); el.dataset.done='1'; } }); }
 function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+
+// ===== 轻量 Markdown 渲染（无外部依赖，先转义再解析，防 XSS）=====
+function mdEscape(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function mdInline(s){
+    return s
+        .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+        .replace(/__([^_]+)__/g,'<strong>$1</strong>')
+        .replace(/\*([^*\n]+)\*/g,'<em>$1</em>')
+        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,(m,t,u)=>{
+            const safe=/^(https?:|mailto:)/i.test(u)?u:'#';
+            return '<a href="'+safe+'" target="_blank" rel="noopener">'+t+'</a>';
+        });
+}
+function renderMarkdown(src){
+    if(src==null) return '';
+    const blocks=[];
+    // 抽出围栏代码块(占位，避免内部内容被当 markdown 解析)
+    let text=src.replace(/```[a-zA-Z0-9]*\n?([\s\S]*?)```/g,(m,code)=>{
+        blocks.push(code.replace(/\n$/,'')); return ' CB'+(blocks.length-1)+' ';
+    });
+    text=mdEscape(text);
+    const inlineCodes=[];
+    text=text.replace(/`([^`\n]+)`/g,(m,c)=>{ inlineCodes.push(c); return ' IC'+(inlineCodes.length-1)+' '; });
+    const lines=text.split('\n');
+    let html='', list=null;
+    const closeList=()=>{ if(list){ html+='</'+list+'>'; list=null; } };
+    for(let line of lines){
+        let m;
+        if(m=line.match(/^(#{1,4})\s+(.*)$/)){ closeList(); const n=m[1].length; html+='<h'+n+'>'+mdInline(m[2])+'</h'+n+'>'; continue; }
+        if(/^\s*([-*_])\1\1+\s*$/.test(line)){ closeList(); html+='<hr>'; continue; }
+        if(m=line.match(/^>\s?(.*)$/)){ closeList(); html+='<blockquote>'+mdInline(m[1])+'</blockquote>'; continue; }
+        if(m=line.match(/^\s*\d+\.\s+(.*)$/)){ if(list!=='ol'){ closeList(); html+='<ol>'; list='ol'; } html+='<li>'+mdInline(m[1])+'</li>'; continue; }
+        if(m=line.match(/^\s*[-*]\s+(.*)$/)){ if(list!=='ul'){ closeList(); html+='<ul>'; list='ul'; } html+='<li>'+mdInline(m[1])+'</li>'; continue; }
+        if(/^\s*$/.test(line)){ closeList(); continue; }
+        closeList(); html+='<p>'+mdInline(line)+'</p>';
+    }
+    closeList();
+    html=html.replace(/ IC(\d+) /g,(m,n)=>'<code>'+mdEscape(inlineCodes[+n])+'</code>');
+    html=html.replace(/ CB(\d+) /g,(m,n)=>'<pre><code>'+mdEscape(blocks[+n])+'</code></pre>');
+    return html;
+}
+
 paintIcons();
 
 // ===== 状态 =====
@@ -511,7 +574,8 @@ function addRow(text, who, animate=true){
     mini.innerHTML=svgFor(who==='me'?'user':'bot');
     const bubble=document.createElement('div');
     bubble.className='bubble '+who;
-    bubble.textContent=text;
+    if(who==='ai'){ bubble.classList.add('md'); bubble.dataset.raw=text||''; bubble.innerHTML=renderMarkdown(text||''); }
+    else bubble.textContent=text;
     row.appendChild(mini); row.appendChild(bubble);
     $('log').appendChild(row);
     $('log').scrollTop=$('log').scrollHeight;
@@ -544,8 +608,13 @@ async function send(){
             const events=buffer.split('\n\n'); buffer=events.pop();
             for(const ev of events){
                 const data=ev.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5)).join('\n');
-                if(data){ aiBubble.textContent+=data; $('log').scrollTop=$('log').scrollHeight; }
+                if(data){ aiBubble.dataset.raw=(aiBubble.dataset.raw||'')+data; aiBubble.innerHTML=renderMarkdown(aiBubble.dataset.raw); $('log').scrollTop=$('log').scrollHeight; }
             }
+        }
+        // 回答完成，附上 👍/👎 反馈条
+        const aiText=(aiBubble.dataset.raw||'').trim();
+        if(aiText){
+            addFeedbackBar(text, aiText);
         }
         // 刷新会话列表（标题和计数已由后端更新）
         await loadSessions();
@@ -554,8 +623,31 @@ async function send(){
             $('chatTitle').textContent=updated.title;
             $('chatMeta').textContent=updated.messageCount+'条消息';
         }
-    }catch(e){ aiBubble.textContent+='\n[连接中断: '+e.message+']'; }
+    }catch(e){ aiBubble.dataset.raw=(aiBubble.dataset.raw||'')+'\n\n[连接中断: '+e.message+']'; aiBubble.innerHTML=renderMarkdown(aiBubble.dataset.raw); }
     finally{ $('sendBtn').disabled=false; $('msgInput').focus(); }
+}
+
+// ===== RAG 反馈（👍/👎）=====
+function addFeedbackBar(query, answer){
+    const bar=document.createElement('div');
+    bar.className='fb-bar';
+    bar.innerHTML='<span class="fb-q">这条回答有帮助吗？</span>';
+    const up=document.createElement('button'); up.className='fb-btn'; up.textContent='👍'; up.title='有帮助';
+    const down=document.createElement('button'); down.className='fb-btn'; down.textContent='👎'; down.title='没帮助';
+    up.onclick=()=>submitFeedback(bar,query,answer,'UP');
+    down.onclick=()=>submitFeedback(bar,query,answer,'DOWN');
+    bar.appendChild(up); bar.appendChild(down);
+    $('log').appendChild(bar);
+    $('log').scrollTop=$('log').scrollHeight;
+}
+async function submitFeedback(bar,query,answer,rating){
+    let comment='';
+    if(rating==='DOWN'){ comment=prompt('谢谢反馈！可以说说哪里不满意吗？（可留空）')||''; }
+    try{
+        await fetch('/api/feedback',{ method:'POST', headers:jsonHeader(),
+            body:JSON.stringify({ sessionId:currentSessionId, query, answer, rating, comment }) });
+        bar.innerHTML='<span class="fb-done">✓ 感谢你的反馈</span>';
+    }catch(e){ bar.innerHTML='<span class="fb-done">反馈提交失败</span>'; }
 }
 
 // ===== 个人信息 =====

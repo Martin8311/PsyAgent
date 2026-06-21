@@ -76,23 +76,58 @@ public class KnowledgeBaseService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    /** 语义检索：返回与 query 最相关的 top-k 文本片段。 */
+    /** 语义检索：返回与 query 最相关的 top-k 文本片段(供 Agent 注入回复)。 */
     public Mono<List<String>> search(String query) {
+        return searchWithMeta(query, props.getTopK())
+                .map(list -> list.stream().map(RetrievedChunk::text).toList());
+    }
+
+    /** 带元数据检索(用配置的默认 topK)。 */
+    public Mono<List<RetrievedChunk>> searchWithMeta(String query) {
+        return searchWithMeta(query, props.getTopK());
+    }
+
+    /**
+     * 带元数据的语义检索：返回片段 + 来源文档ID + 分数，供 RAG 评测与在线反馈使用。
+     * topK 可外部指定(评测时常用较大 K)，相似度阈值沿用配置。
+     */
+    public Mono<List<RetrievedChunk>> searchWithMeta(String query, int topK) {
         if (query == null || query.isBlank()) {
             return Mono.just(List.of());
         }
         return Mono.fromCallable(() -> {
             SearchRequest request = SearchRequest.builder()
                     .query(query)
-                    .topK(props.getTopK())
+                    .topK(topK)
                     .similarityThreshold(props.getMinScore())
                     .build();
             List<Document> hits = vectorStore.similaritySearch(request);
             if (hits == null || hits.isEmpty()) {
-                return List.<String>of();
+                return List.<RetrievedChunk>of();
             }
-            return hits.stream().map(Document::getText).toList();
+            return hits.stream().map(d -> {
+                Map<String, Object> m = d.getMetadata();
+                Long docId = toLong(m.get("documentId"));
+                int seq = (m.get("seq") instanceof Number n) ? n.intValue() : -1;
+                String title = m.get("title") == null ? "" : m.get("title").toString();
+                double score = d.getScore() == null ? 0.0 : d.getScore();
+                return new RetrievedChunk(d.getText(), docId, seq, title, score);
+            }).toList();
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private static Long toLong(Object o) {
+        if (o instanceof Number n) {
+            return n.longValue();
+        }
+        if (o instanceof String s) {
+            try {
+                return Long.parseLong(s.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /** 返回单篇文档的切块列表（管理后台查看向量化内容）。 */

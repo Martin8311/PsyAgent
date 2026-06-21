@@ -32,6 +32,8 @@ public class AgentContext {
     // ===== 知识检索(RAG, Phase 4) =====
     private boolean knowledgeRetrieved = false;
     private final List<String> knowledgeSnippets = new ArrayList<>();
+    /** 本次检索命中的来源文档 ID(供在线反馈关联，分析知识盲区)。 */
+    private final List<Long> retrievedDocIds = new ArrayList<>();
 
     // ===== 风险评估(Phase 5) =====
     private RiskAssessment risk;
@@ -82,6 +84,10 @@ public class AgentContext {
 
     public List<String> getKnowledgeSnippets() {
         return knowledgeSnippets;
+    }
+
+    public List<Long> getRetrievedDocIds() {
+        return retrievedDocIds;
     }
 
     public RiskAssessment getRisk() {

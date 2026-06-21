@@ -5,6 +5,7 @@ import com.mindbridge.agent.AgentRuntimeService;
 import com.mindbridge.ai.ChatMessage;
 import com.mindbridge.async.AsyncPublisher;
 import com.mindbridge.async.ChatLogMessage;
+import com.mindbridge.eval.FeedbackService;
 import com.mindbridge.memory.ChatMemoryService;
 import com.mindbridge.session.SessionService;
 import org.springframework.http.MediaType;
@@ -28,15 +29,18 @@ public class ChatController {
     private final ChatMemoryService chatMemoryService;
     private final SessionService sessionService;
     private final AsyncPublisher asyncPublisher;
+    private final FeedbackService feedbackService;
 
     public ChatController(AgentRuntimeService agentRuntime,
                           ChatMemoryService chatMemoryService,
                           SessionService sessionService,
-                          AsyncPublisher asyncPublisher) {
+                          AsyncPublisher asyncPublisher,
+                          FeedbackService feedbackService) {
         this.agentRuntime = agentRuntime;
         this.chatMemoryService = chatMemoryService;
         this.sessionService = sessionService;
         this.asyncPublisher = asyncPublisher;
+        this.feedbackService = feedbackService;
     }
 
     @PostMapping(value = "/api/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -79,6 +83,8 @@ public class ChatController {
                                     userId, sessionId, message, aiReply, riskLevel, Instant.now())))
                             .subscribeOn(Schedulers.boundedElastic())
                             .subscribe();
+                    // 暂存本次检索命中的文档, 供学生反馈时关联(分析知识盲区)
+                    feedbackService.rememberRetrievedDocs(sessionId, context.getRetrievedDocIds()).subscribe();
                 });
     }
 }

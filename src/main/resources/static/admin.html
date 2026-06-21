@@ -171,6 +171,10 @@
                     <span class="ic" data-i="sheet"></span>对话台账</div>
                 <div class="nav-item" data-view="kb" onclick="switchView('kb')">
                     <span class="ic" data-i="book"></span>知识库管理</div>
+                <div class="nav-item" data-view="eval" onclick="switchView('eval')">
+                    <span class="ic" data-i="chart"></span>RAG 评测</div>
+                <div class="nav-item" data-view="feedback" onclick="switchView('feedback')">
+                    <span class="ic" data-i="thumb"></span>用户反馈</div>
             </nav>
             <div class="side-foot">
                 <div class="logout" onclick="logout()"><span class="ic" data-i="logout"></span>退出登录</div>
@@ -248,6 +252,49 @@
                         <div id="chatlogsBody"></div>
                     </div>
                 </div>
+
+                <!-- RAG 评测 -->
+                <div id="view-eval" class="hidden">
+                    <div class="stats">
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>命中率 Hit@K</div><div class="num" id="mHit">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>MRR</div><div class="num" id="mMrr">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>准确率 / 召回率</div><div class="num" id="mPr" style="font-size:20px">—</div></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="chart"></span>评测集（golden set）</h2>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input id="perDoc" type="number" value="3" min="1" max="10" title="每篇文档生成几个问题"
+                                    style="width:54px;padding:7px;border:1px solid var(--line);border-radius:8px;font-family:inherit">
+                                <button class="btn-ghost" onclick="genEval()"><span class="ic" data-i="upload"></span>LLM 生成</button>
+                                <button class="btn-primary" style="width:auto;padding:8px 16px" onclick="runEval()">跑评测</button>
+                                <button class="btn-ghost" onclick="loadEval()"><span class="ic" data-i="refresh"></span>刷新</button>
+                            </div>
+                        </div>
+                        <div id="evalMsg" class="kb-msg hidden"></div>
+                        <div id="evalQueriesBody"></div>
+                    </div>
+                    <div class="panel" style="margin-top:16px">
+                        <div class="panel-head"><h2><span class="ic" data-i="clock"></span>历史评测（指标趋势 / 调参对比）</h2></div>
+                        <div id="evalRunsBody"></div>
+                    </div>
+                </div>
+
+                <!-- 用户反馈 -->
+                <div id="view-feedback" class="hidden">
+                    <div class="stats">
+                        <div class="stat"><div class="top"><span class="ic" data-i="thumb"></span>满意率</div><div class="num" id="fbSat">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="thumb"></span>👍 赞</div><div class="num" id="fbUp">0</div></div>
+                        <div class="stat danger"><div class="top"><span class="ic" data-i="thumb"></span>👎 踩</div><div class="num" id="fbDown">0</div></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="thumb"></span>用户反馈记录</h2>
+                            <button class="btn-ghost" onclick="loadFeedback()"><span class="ic" data-i="refresh"></span>刷新</button>
+                        </div>
+                        <div id="feedbackBody"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -319,6 +366,8 @@
             upload:'<path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
             lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
             trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>',
+            chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+            thumb:'<path d="M7 11v9M2 13v5a2 2 0 0 0 2 2h13l3-7v-2a2 2 0 0 0-2-2h-5l1-4a2 2 0 0 0-2-2l-5 7z"/>',
             users:'<path d="M16 21v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7" r="3"/><path d="M22 21v-1a4 4 0 0 0-3-3.85"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
             sheet:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>',
             download:'<path d="M12 4v12M8 12l4 4 4-4"/><path d="M4 20h16"/>'
@@ -331,10 +380,10 @@
         function authHeader(){ return { 'Authorization':'Basic '+cred() }; }
         function jsonHeader(){ return Object.assign({ 'Content-Type':'application/json' }, authHeader()); }
 
-        const VIEW_TITLES = { alerts:'预警台账', students:'学生管理', chatlogs:'对话台账', kb:'知识库管理' };
+        const VIEW_TITLES = { alerts:'预警台账', students:'学生管理', chatlogs:'对话台账', kb:'知识库管理', eval:'RAG 评测', feedback:'用户反馈' };
         function switchView(v){
             document.querySelectorAll('.nav-item').forEach(n=> n.classList.toggle('active', n.dataset.view===v));
-            ['alerts','students','chatlogs','kb'].forEach(x=>{
+            ['alerts','students','chatlogs','kb','eval','feedback'].forEach(x=>{
                 const el=document.getElementById('view-'+x);
                 if(el) el.classList.toggle('hidden', x!==v);
             });
@@ -342,6 +391,8 @@
             if(v==='kb') loadKbDocs();
             if(v==='students') loadStudents();
             if(v==='chatlogs') loadChatLogs();
+            if(v==='eval') loadEval();
+            if(v==='feedback') loadFeedback();
         }
         function logout(){ sessionStorage.removeItem(KEY); location.href='/index.html'; }
 
@@ -629,6 +680,143 @@
                 const a=document.createElement('a'); a.href=url; a.download=file; a.click();
                 URL.revokeObjectURL(url);
             }catch(e){ alert('网络错误：'+e.message); }
+        }
+
+        // ===== RAG 评测 =====
+        async function loadEval(){ await Promise.all([loadEvalQueries(), loadEvalRuns()]); }
+        async function loadEvalQueries(){
+            const body=document.getElementById('evalQueriesBody');
+            body.innerHTML='<div class="empty">加载中…</div>';
+            try{
+                const r=await fetch('/api/admin/eval/queries',{ headers:authHeader() });
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok){ body.innerHTML='<div class="empty">加载失败（'+r.status+'）</div>'; return; }
+                renderEvalQueries(await r.json());
+            }catch(e){ body.innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+        function renderEvalQueries(list){
+            const body=document.getElementById('evalQueriesBody');
+            if(!list.length){ body.innerHTML='<div class="empty"><span class="ic" data-i="chart"></span>还没有评测样例，点「LLM 生成」从知识库自动生成</div>'; paintIcons(); return; }
+            const reviewed=list.filter(q=>q.reviewed).length;
+            let rows='';
+            for(const q of list){
+                const st = q.reviewed
+                    ? '<span class="badge st-GUARDIAN_NOTIFIED">已确认</span>'
+                    : '<span class="badge st-PENDING_REVIEW">待校正</span>';
+                rows+='<tr>'
+                    +'<td class="msg-cell">'+esc(q.query)+'</td>'
+                    +'<td class="emo">#'+q.expectedDocId+' '+esc(q.expectedTitle)+'</td>'
+                    +'<td>'+st+'</td>'
+                    +'<td style="white-space:nowrap">'
+                    +(q.reviewed?'':'<button class="btn-notify" onclick="confirmEval('+q.id+')">确认</button>')
+                    +'<button class="btn-del" onclick="delEval('+q.id+')"><span class="ic" data-i="trash"></span>删</button>'
+                    +'</td></tr>';
+            }
+            body.innerHTML='<div class="emo" style="margin-bottom:8px">共 '+list.length+' 条，已确认 '+reviewed+' 条（只有已确认的参与评测）</div>'
+                +'<table><thead><tr><th>问题</th><th>期望文档</th><th>状态</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
+            paintIcons();
+        }
+        async function confirmEval(id){
+            await fetch('/api/admin/eval/queries/'+id,{ method:'PUT', headers:jsonHeader(), body:JSON.stringify({reviewed:true}) });
+            loadEvalQueries();
+        }
+        async function delEval(id){
+            if(!confirm('删除这条评测样例？')) return;
+            await fetch('/api/admin/eval/queries/'+id,{ method:'DELETE', headers:authHeader() });
+            loadEvalQueries();
+        }
+        async function genEval(){
+            const perDoc=document.getElementById('perDoc').value||3;
+            const msg=document.getElementById('evalMsg');
+            msg.classList.remove('hidden'); msg.className='kb-msg load';
+            msg.textContent='正在用 LLM 为每篇文档生成问题，请稍候（每篇约几秒）…';
+            try{
+                const r=await fetch('/api/admin/eval/generate?perDoc='+perDoc,{ method:'POST', headers:authHeader() });
+                if(r.ok){ const d=await r.json(); msg.className='kb-msg ok'; msg.textContent='✓ 生成 '+d.generated+' 条，请逐条校正后点「确认」'; loadEvalQueries(); }
+                else{ msg.className='kb-msg err'; msg.textContent='生成失败（'+r.status+'）'; }
+            }catch(e){ msg.className='kb-msg err'; msg.textContent='网络错误：'+e.message; }
+        }
+        async function runEval(){
+            const msg=document.getElementById('evalMsg');
+            msg.classList.remove('hidden'); msg.className='kb-msg load'; msg.textContent='正在跑评测…';
+            try{
+                const r=await fetch('/api/admin/eval/run',{ method:'POST', headers:jsonHeader(), body:JSON.stringify({}) });
+                if(r.ok){ const m=await r.json(); msg.className='kb-msg ok'; msg.textContent='✓ 评测完成（'+m.queryCount+' 条样例）'; showMetrics(m); loadEvalRuns(); }
+                else{ let d=''; try{ d=(await r.json()).message||''; }catch(_){}; msg.className='kb-msg err'; msg.textContent='评测失败（'+r.status+'）'+(d?'：'+d:''); }
+            }catch(e){ msg.className='kb-msg err'; msg.textContent='网络错误：'+e.message; }
+        }
+        function showMetrics(m){
+            document.getElementById('mHit').textContent=(m.hitRate*100).toFixed(1)+'%';
+            document.getElementById('mMrr').textContent=Number(m.mrr).toFixed(3);
+            document.getElementById('mPr').textContent='P '+Number(m.avgPrecision).toFixed(3)+' / R '+Number(m.avgRecall).toFixed(3);
+        }
+        async function loadEvalRuns(){
+            const body=document.getElementById('evalRunsBody');
+            try{
+                const r=await fetch('/api/admin/eval/runs',{ headers:authHeader() });
+                if(!r.ok){ body.innerHTML='<div class="empty">加载失败（'+r.status+'）</div>'; return; }
+                const list=await r.json();
+                if(list.length) showMetrics(list[0]);
+                renderEvalRuns(list);
+            }catch(e){ body.innerHTML='<div class="empty">网络错误</div>'; }
+        }
+        function renderEvalRuns(list){
+            const body=document.getElementById('evalRunsBody');
+            if(!list.length){ body.innerHTML='<div class="empty">还没有评测记录，点「跑评测」生成第一条</div>'; return; }
+            let rows='';
+            for(const r of list){
+                const t=new Date(r.runAt).toLocaleString('zh-CN');
+                rows+='<tr><td class="emo" style="white-space:nowrap">'+esc(t)+'</td>'
+                    +'<td class="emo">topK='+r.topK+' / minScore='+r.minScore+'</td>'
+                    +'<td>'+r.queryCount+'</td>'
+                    +'<td><b>'+(r.hitRate*100).toFixed(1)+'%</b></td>'
+                    +'<td>'+Number(r.avgPrecision).toFixed(3)+'</td>'
+                    +'<td>'+Number(r.avgRecall).toFixed(3)+'</td>'
+                    +'<td>'+Number(r.mrr).toFixed(3)+'</td></tr>';
+            }
+            body.innerHTML='<table><thead><tr><th>时间</th><th>参数快照</th><th>样例</th><th>Hit@K</th><th>P@K</th><th>R@K</th><th>MRR</th></tr></thead><tbody>'+rows+'</tbody></table>';
+        }
+
+        // ===== 用户反馈 =====
+        async function loadFeedback(){ await Promise.all([loadFbStats(), loadFbList()]); }
+        async function loadFbStats(){
+            try{
+                const r=await fetch('/api/admin/feedback/stats',{ headers:authHeader() });
+                if(!r.ok) return;
+                const s=await r.json();
+                document.getElementById('fbSat').textContent=(s.satisfaction*100).toFixed(0)+'%';
+                document.getElementById('fbUp').textContent=s.up;
+                document.getElementById('fbDown').textContent=s.down;
+            }catch(e){}
+        }
+        async function loadFbList(){
+            const body=document.getElementById('feedbackBody');
+            body.innerHTML='<div class="empty">加载中…</div>';
+            try{
+                const r=await fetch('/api/admin/feedback',{ headers:authHeader() });
+                if(r.status===403){ showBlocker('需要管理员权限'); return; }
+                if(!r.ok){ body.innerHTML='<div class="empty">加载失败（'+r.status+'）</div>'; return; }
+                renderFeedback(await r.json());
+            }catch(e){ body.innerHTML='<div class="empty">网络错误</div>'; }
+        }
+        function renderFeedback(list){
+            const body=document.getElementById('feedbackBody');
+            if(!list.length){ body.innerHTML='<div class="empty"><span class="ic" data-i="thumb"></span>还没有用户反馈</div>'; paintIcons(); return; }
+            let rows='';
+            for(const f of list){
+                const t=new Date(f.createdAt).toLocaleString('zh-CN');
+                const r=f.rating==='UP'
+                    ? '<span class="badge st-GUARDIAN_NOTIFIED">👍 赞</span>'
+                    : '<span class="badge lv-HIGH">👎 踩</span>';
+                rows+='<tr><td class="emo" style="white-space:nowrap">'+esc(t)+'</td>'
+                    +'<td><b>'+esc(f.userId)+'</b></td>'
+                    +'<td>'+r+'</td>'
+                    +'<td class="msg-cell">'+esc(f.query)+'</td>'
+                    +'<td class="emo">'+esc(f.comment)+'</td>'
+                    +'<td class="emo">'+esc(f.retrievedDocIds)+'</td></tr>';
+            }
+            body.innerHTML='<table><thead><tr><th>时间</th><th>用户</th><th>评价</th><th>问题</th><th>备注</th><th>命中文档</th></tr></thead><tbody>'+rows+'</tbody></table>';
+            paintIcons();
         }
 
         function showBlocker(msg){
