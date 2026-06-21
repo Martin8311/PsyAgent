@@ -26,6 +26,7 @@ public class EvalRun {
 
     // ===== 参数快照 =====
     private int topK;
+    private int candidateK;
     private double minScore;
     private int chunkSize;
 
@@ -43,9 +44,10 @@ public class EvalRun {
     protected EvalRun() {
     }
 
-    public EvalRun(int topK, double minScore, int chunkSize, String note) {
+    public EvalRun(int topK, int candidateK, double minScore, int chunkSize, String note) {
         this.runAt = Instant.now();
         this.topK = topK;
+        this.candidateK = candidateK;
         this.minScore = minScore;
         this.chunkSize = chunkSize;
         this.note = note;
@@ -54,6 +56,7 @@ public class EvalRun {
     public Long getId() { return id; }
     public Instant getRunAt() { return runAt; }
     public int getTopK() { return topK; }
+    public int getCandidateK() { return candidateK; }
     public double getMinScore() { return minScore; }
     public int getChunkSize() { return chunkSize; }
     public int getQueryCount() { return queryCount; }

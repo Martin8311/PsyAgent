@@ -53,14 +53,19 @@ public class EvalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "评测集为空(无已校正样例)，请先生成评测集并在后台校正确认");
         }
+        int topK = props.getTopK();
+        int candidateK = props.getCandidateK();
         EvalRun run = runRepo.save(new EvalRun(
-                props.getTopK(), props.getMinScore(), props.getChunkSize(), note));
+                topK, candidateK, props.getMinScore(), props.getChunkSize(), note));
 
+        // 口径分离：用 candidateK 大召回测「召回能力」(Recall@candidateK / MRR@candidateK)，
+        // 再截断到 topK 测「最终命中」(Hit@topK / Precision@topK)。这样能区分
+        // 「根本没召回到」与「召回到了但没排进前 topK」两类问题。
         double sumP = 0, sumR = 0, sumRR = 0;
-        int hits = 0;
+        int hits = 0;   // Hit@topK 计数
         for (EvalQuery q : queries) {
             List<RetrievedChunk> chunks = knowledgeBaseService
-                    .searchWithMeta(q.getQuery(), props.getTopK()).block();
+                    .searchWithMeta(q.getQuery(), candidateK).block();
             // chunk 映射到文档，保序去重
             List<Long> retrieved = (chunks == null) ? List.of() : chunks.stream()
                     .map(RetrievedChunk::documentId)
@@ -68,22 +73,26 @@ public class EvalService {
                     .distinct()
                     .toList();
 
-            int idx = retrieved.indexOf(q.getExpectedDocId());
-            boolean hit = idx >= 0;
-            int rank = hit ? idx + 1 : 0;
-            double rr = hit ? 1.0 / rank : 0.0;
-            // 文档级：期望集大小=1
-            double precision = retrieved.isEmpty() ? 0.0 : (hit ? 1.0 / retrieved.size() : 0.0);
-            double recall = hit ? 1.0 : 0.0;
+            int idx = retrieved.indexOf(q.getExpectedDocId());       // candidateK 内排名(0-based)
+            boolean recalled = idx >= 0;                              // 是否召回到(Recall@candidateK)
+            int rank = recalled ? idx + 1 : 0;
+            double rr = recalled ? 1.0 / rank : 0.0;                  // MRR@candidateK
+
+            // 截断到 topK 看最终命中
+            List<Long> topDocs = retrieved.size() > topK ? retrieved.subList(0, topK) : retrieved;
+            boolean hitTopK = topDocs.contains(q.getExpectedDocId());
+            double precision = topDocs.isEmpty() ? 0.0 : (hitTopK ? 1.0 / topDocs.size() : 0.0);
+            double recall = recalled ? 1.0 : 0.0;                     // 文档级期望集=1
 
             sumP += precision;
             sumR += recall;
             sumRR += rr;
-            if (hit) {
+            if (hitTopK) {
                 hits++;
             }
+            // 明细记录召回排名(rank)与是否召回(recalled)，便于下钻"召回到但没排进前topK"
             resultRepo.save(new EvalResultItem(run.getId(), q.getId(), q.getQuery(),
-                    q.getExpectedDocId(), toJson(retrieved), hit, rank, precision, recall, rr));
+                    q.getExpectedDocId(), toJson(retrieved), recalled, rank, precision, recall, rr));
         }
 
         int n = queries.size();

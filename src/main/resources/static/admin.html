@@ -222,9 +222,25 @@
                     <div class="panel" style="margin-top:16px">
                         <div class="panel-head">
                             <h2><span class="ic" data-i="book"></span>知识文档列表</h2>
-                            <button class="btn-ghost" onclick="loadKbDocs()"><span class="ic" data-i="refresh"></span>刷新</button>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <button class="btn-ghost" onclick="reindexKb()" title="改了切块/检索策略后，按当前策略重新向量化全部文档"><span class="ic" data-i="refresh"></span>重建索引</button>
+                                <button class="btn-ghost" onclick="loadKbDocs()"><span class="ic" data-i="refresh"></span>刷新</button>
+                            </div>
                         </div>
+                        <div id="kbReindexMsg" class="kb-msg hidden"></div>
                         <div id="kbDocsBody"></div>
+                    </div>
+                    <div class="panel" style="margin-top:16px">
+                        <div class="panel-head">
+                            <h2><span class="ic" data-i="chart"></span>检索诊断（排查检索偏置）</h2>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+                            <input id="diagQ" placeholder="输入一句学生可能问的话，看 top-10 命中哪些文档与分数"
+                                style="flex:1;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:inherit"
+                                onkeydown="if(event.key==='Enter')runDiagnose()">
+                            <button class="btn-primary" style="width:auto;padding:8px 16px" onclick="runDiagnose()">诊断</button>
+                        </div>
+                        <div id="diagBody"></div>
                     </div>
                 </div>
 
@@ -256,9 +272,9 @@
                 <!-- RAG 评测 -->
                 <div id="view-eval" class="hidden">
                     <div class="stats">
-                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>命中率 Hit@K</div><div class="num" id="mHit">—</div></div>
-                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>MRR</div><div class="num" id="mMrr">—</div></div>
-                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>准确率 / 召回率</div><div class="num" id="mPr" style="font-size:20px">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>命中率 Hit@topK</div><div class="num" id="mHit">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>MRR@候选K</div><div class="num" id="mMrr">—</div></div>
+                        <div class="stat"><div class="top"><span class="ic" data-i="chart"></span>召回率R@候选K / 准确率P@topK</div><div class="num" id="mPr" style="font-size:20px">—</div></div>
                     </div>
                     <div class="panel">
                         <div class="panel-head">
@@ -682,6 +698,41 @@
             }catch(e){ alert('网络错误：'+e.message); }
         }
 
+        // ===== 知识库：重建索引 / 检索诊断 =====
+        async function reindexKb(){
+            if(!confirm('按当前切块/检索策略重建全部文档的向量索引？\n（耗时取决于文档量，期间检索结果可能短暂波动）')) return;
+            const msg=document.getElementById('kbReindexMsg');
+            msg.classList.remove('hidden'); msg.className='kb-msg load';
+            msg.textContent='正在重建索引，请稍候（每篇需重新向量化，约几秒/篇）…';
+            try{
+                const r=await fetch('/api/admin/kb/reindex',{ method:'POST', headers:authHeader() });
+                if(r.ok){ const d=await r.json(); msg.className='kb-msg ok'; msg.textContent='✓ 重建完成：'+d.docs+' 篇文档，共 '+d.chunks+' 个切块'; loadKbDocs(); }
+                else{ msg.className='kb-msg err'; msg.textContent='重建失败（'+r.status+'）'; }
+            }catch(e){ msg.className='kb-msg err'; msg.textContent='网络错误：'+e.message; }
+        }
+        async function runDiagnose(){
+            const q=document.getElementById('diagQ').value.trim();
+            const body=document.getElementById('diagBody');
+            if(!q){ body.innerHTML='<div class="empty">先输入一个问题</div>'; return; }
+            body.innerHTML='<div class="empty">检索中…</div>';
+            try{
+                const r=await fetch('/api/admin/kb/diagnose?k=10&q='+encodeURIComponent(q),{ headers:authHeader() });
+                if(!r.ok){ body.innerHTML='<div class="empty">检索失败（'+r.status+'）</div>'; return; }
+                const list=await r.json();
+                if(!list.length){ body.innerHTML='<div class="empty">没有任何片段超过相似度阈值（minScore），说明召回为空——可考虑调低阈值或检查切块。</div>'; return; }
+                let rows='';
+                for(let i=0;i<list.length;i++){
+                    const c=list[i];
+                    rows+='<tr><td>'+(i+1)+'</td>'
+                        +'<td class="emo" style="white-space:nowrap">#'+c.documentId+' '+esc(c.title)+'</td>'
+                        +'<td>'+c.seq+'</td>'
+                        +'<td><b>'+Number(c.score).toFixed(3)+'</b></td>'
+                        +'<td class="msg-cell">'+esc(c.preview)+'</td></tr>';
+                }
+                body.innerHTML='<table><thead><tr><th>#</th><th>文档</th><th>块序</th><th>相似度</th><th>片段预览</th></tr></thead><tbody>'+rows+'</tbody></table>';
+            }catch(e){ body.innerHTML='<div class="empty">网络错误：'+esc(e.message)+'</div>'; }
+        }
+
         // ===== RAG 评测 =====
         async function loadEval(){ await Promise.all([loadEvalQueries(), loadEvalRuns()]); }
         async function loadEvalQueries(){
@@ -767,14 +818,14 @@
             for(const r of list){
                 const t=new Date(r.runAt).toLocaleString('zh-CN');
                 rows+='<tr><td class="emo" style="white-space:nowrap">'+esc(t)+'</td>'
-                    +'<td class="emo">topK='+r.topK+' / minScore='+r.minScore+'</td>'
+                    +'<td class="emo">topK='+r.topK+' / candK='+(r.candidateK||'-')+' / minScore='+r.minScore+'</td>'
                     +'<td>'+r.queryCount+'</td>'
                     +'<td><b>'+(r.hitRate*100).toFixed(1)+'%</b></td>'
                     +'<td>'+Number(r.avgPrecision).toFixed(3)+'</td>'
                     +'<td>'+Number(r.avgRecall).toFixed(3)+'</td>'
                     +'<td>'+Number(r.mrr).toFixed(3)+'</td></tr>';
             }
-            body.innerHTML='<table><thead><tr><th>时间</th><th>参数快照</th><th>样例</th><th>Hit@K</th><th>P@K</th><th>R@K</th><th>MRR</th></tr></thead><tbody>'+rows+'</tbody></table>';
+            body.innerHTML='<table><thead><tr><th>时间</th><th>参数快照</th><th>样例</th><th>Hit@topK</th><th>P@topK</th><th>R@candK</th><th>MRR</th></tr></thead><tbody>'+rows+'</tbody></table>';
         }
 
         // ===== 用户反馈 =====

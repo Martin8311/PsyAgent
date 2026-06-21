@@ -94,13 +94,27 @@ mindbridge:
     # 会话记录在 Redis 中的过期天数
     ttl-days: 7
   knowledge:
-    # RAG 检索返回的片段数
+    # RAG 重排后最终注入的片段数
     top-k: 3
+    # 召回候选数：先用大 K 召回，再由重排截断到 top-k（评测也用此 K 测召回能力）
+    candidate-k: 20
     # 相似度阈值：低于此分数的片段视为不相关，不注入回答
     min-score: 0.3
-    # 文本切块：每块约 400 字，相邻块重叠 80 字以保留上下文
-    chunk-size: 400
-    chunk-overlap: 80
+    # 文本切块：每块约 500 字，相邻块重叠 100 字（整句回退）以保留上下文
+    chunk-size: 500
+    chunk-overlap: 100
+    # 入库时把标题拼进 chunk 一起向量化，提升"问概念名"类检索
+    title-in-chunk: true
+    # bge-m3 为对称编码，query 前缀留空即可
+    query-instruction: ""
+    # 混合检索：向量 + BM25 关键词双路召回 + RRF 融合（关掉退回纯向量）
+    hybrid-enabled: true
+    rrf-k: 60
+    # 文档多样性降权：破除单文档霸榜
+    doc-diversity-decay: 0.5
+    # LLM 重排：把候选交给 qwen2.5:3b 精排，提升 topK 命中（每次检索多一次 LLM 调用）
+    rerank-enabled: true
+    rerank-top-n: 10
   # ===== 异步对话台账 (按 用户+会话 分文件) =====
   excel:
     dir: ./data/chat-logs

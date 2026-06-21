@@ -226,6 +226,28 @@ public class AdminController {
                 .thenReturn(Map.<String, Object>of("deleted", id));
     }
 
+    /** 重建索引：按当前切块/标题策略，从 MySQL 原文重新向量化（改检索策略后调用）。 */
+    @PostMapping("/kb/reindex")
+    public Mono<Map<String, Object>> reindexKb() {
+        return knowledgeBaseService.reindexAll();
+    }
+
+    /** 检索诊断：返回 query 的 top-k 命中片段(文档/序号/分数/预览)，排查检索偏置。 */
+    @GetMapping("/kb/diagnose")
+    public Mono<List<Map<String, Object>>> diagnoseKb(@RequestParam String q,
+                                                      @RequestParam(defaultValue = "10") int k) {
+        return knowledgeBaseService.searchWithMeta(q, k)
+                .map(list -> list.stream()
+                        .map(c -> Map.<String, Object>of(
+                                "documentId", c.documentId() == null ? -1L : c.documentId(),
+                                "title", c.title(),
+                                "seq", c.seq(),
+                                "score", Math.round(c.score() * 1000.0) / 1000.0,
+                                "preview", c.text() == null ? "" :
+                                        (c.text().length() > 80 ? c.text().substring(0, 80) + "…" : c.text())))
+                        .toList());
+    }
+
     private static String nz(String s) {
         return s == null ? "" : s;
     }

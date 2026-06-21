@@ -138,6 +138,7 @@ public class EvalController {
                 "id", r.getId(),
                 "runAt", r.getRunAt().toString(),
                 "topK", r.getTopK(),
+                "candidateK", r.getCandidateK(),
                 "minScore", r.getMinScore(),
                 "queryCount", r.getQueryCount(),
                 "avgPrecision", round(r.getAvgPrecision()),

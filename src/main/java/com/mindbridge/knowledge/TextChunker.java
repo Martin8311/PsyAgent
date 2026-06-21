@@ -30,19 +30,49 @@ public class TextChunker {
         }
         String normalized = text.replace("\r\n", "\n").replace('\r', '\n').strip();
 
-        StringBuilder buf = new StringBuilder();
+        // 以「完整句子」为单位累积成块；落块后用末尾若干整句作为重叠续写，
+        // 避免旧实现的字符级硬截断把句子从中间劈开、污染向量。
+        List<String> cur = new ArrayList<>();
+        int curLen = 0;
         for (String sentence : splitSentences(normalized)) {
-            // 当前块已有内容且再加这句会超长 → 先落一块，再带 overlap 续写
-            if (buf.length() > 0 && buf.length() + sentence.length() > chunkSize) {
-                result.add(buf.toString().strip());
-                buf = new StringBuilder(tail(buf.toString(), overlap));
+            if (curLen > 0 && curLen + sentence.length() > chunkSize) {
+                result.add(String.join("", cur).strip());
+                List<String> carry = tailSentences(cur, overlap);
+                cur = new ArrayList<>(carry);
+                curLen = carry.stream().mapToInt(String::length).sum();
             }
-            buf.append(sentence);
+            cur.add(sentence);
+            curLen += sentence.length();
         }
-        if (buf.length() > 0) {
-            result.add(buf.toString().strip());
+        if (curLen > 0) {
+            result.add(String.join("", cur).strip());
         }
         return result.stream().filter(s -> !s.isBlank()).toList();
+    }
+
+    /**
+     * 取句子列表末尾、累计长度约为 overlap 的若干「完整句子」作为下一块的重叠开头。
+     * 上限封顶为半个 chunkSize，并跳过超长硬切句，避免超长无标点文本下重叠退化/重复落块。
+     */
+    private List<String> tailSentences(List<String> sentences, int targetOverlap) {
+        List<String> carry = new ArrayList<>();
+        int len = 0;
+        int cap = Math.max(1, Math.min(chunkSize / 2, targetOverlap));
+        for (int i = sentences.size() - 1; i >= 0; i--) {
+            String s = sentences.get(i);
+            if (s.length() >= chunkSize) {
+                break;                 // 超长硬切句不参与重叠
+            }
+            if (len > 0 && len + s.length() > cap) {
+                break;
+            }
+            carry.add(0, s);
+            len += s.length();
+            if (len >= targetOverlap) {
+                break;
+            }
+        }
+        return carry;
     }
 
     /**
@@ -79,9 +109,5 @@ public class TextChunker {
     private boolean isBoundary(char c) {
         return c == '。' || c == '！' || c == '？' || c == '；'
                 || c == '!' || c == '?' || c == ';' || c == '\n';
-    }
-
-    private String tail(String s, int n) {
-        return s.length() <= n ? s : s.substring(s.length() - n);
     }
 }

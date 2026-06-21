@@ -62,7 +62,9 @@ public class KbDocument {
     public String getFilename() { return filename; }
     public int getCharCount() { return charCount; }
     public int getChunkCount() { return chunkCount; }
+    public void setChunkCount(int chunkCount) { this.chunkCount = chunkCount; }
     public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
     public String getContent() { return content; }
 }
