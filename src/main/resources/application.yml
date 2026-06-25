@@ -88,6 +88,11 @@ mindbridge:
       base-url: http://localhost:11434
       model: qwen2.5:3b
       timeout-seconds: 120
+      # 上下文窗口(Ollama 默认仅 2048，调大避免 prompt 被静默截断)
+      num-ctx: 8192
+      # 情绪/风险评估专用模型(QLoRA 微调)。留空=回退到上面的 model；
+      # 微调部署后改为 ollama 里的模型名，如 mindbridge-emotion
+      emotion-model: ""
   memory:
     # 短期记忆保留的最大消息条数(user+assistant 合计)
     max-messages: 20

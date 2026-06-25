@@ -17,6 +17,8 @@ public record LlmCallMeta(Purpose purpose, String userId, Long sessionId) {
         MEMORY_SUMMARY,
         /** 评测集问题生成。 */
         EVAL_GEN,
+        /** 心理风险/情绪评估(可走专用微调模型)。 */
+        RISK_ASSESS,
         /** 未标注来源。 */
         UNKNOWN
     }

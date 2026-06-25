@@ -26,4 +26,16 @@ public interface EvalQueryRepository extends JpaRepository<EvalQuery, Long> {
     @Transactional
     @Query("DELETE FROM EvalQuery q WHERE q.reviewed = false")
     int deleteByReviewedFalse();
+
+    /** 批量确认(标记 reviewed=true)，返回影响条数。 */
+    @Modifying
+    @Transactional
+    @Query("UPDATE EvalQuery q SET q.reviewed = true WHERE q.id IN :ids")
+    int confirmByIds(List<Long> ids);
+
+    /** 批量删除，返回删除条数。 */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM EvalQuery q WHERE q.id IN :ids")
+    int deleteByIds(List<Long> ids);
 }

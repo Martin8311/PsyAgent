@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -97,6 +98,37 @@ public class EvalController {
     public Mono<Map<String, Object>> clearUnreviewed() {
         return Mono.fromCallable(() -> Map.<String, Object>of("deleted", queryRepo.deleteByReviewedFalse()))
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 批量确认选中样例。body: {"ids":[1,2,3]} */
+    @PostMapping("/queries/batch-confirm")
+    public Mono<Map<String, Object>> batchConfirm(@RequestBody Map<String, Object> body) {
+        List<Long> ids = toIds(body.get("ids"));
+        return Mono.fromCallable(() -> Map.<String, Object>of(
+                        "confirmed", ids.isEmpty() ? 0 : queryRepo.confirmByIds(ids)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 批量删除选中样例。body: {"ids":[1,2,3]} */
+    @PostMapping("/queries/batch-delete")
+    public Mono<Map<String, Object>> batchDelete(@RequestBody Map<String, Object> body) {
+        List<Long> ids = toIds(body.get("ids"));
+        return Mono.fromCallable(() -> Map.<String, Object>of(
+                        "deleted", ids.isEmpty() ? 0 : queryRepo.deleteByIds(ids)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private static List<Long> toIds(Object raw) {
+        if (!(raw instanceof List<?> list)) {
+            return List.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        for (Object o : list) {
+            if (o instanceof Number n) {
+                ids.add(n.longValue());
+            }
+        }
+        return ids;
     }
 
     /** 跑一次评测。 */

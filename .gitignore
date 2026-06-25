@@ -26,3 +26,11 @@ Thumbs.db
 /run-local.ps1
 /env-local.bat
 /env-local.ps1
+/.env
+
+### QLoRA 微调产物(体积大/含数据,不入库; 仅提交脚本与文档) ###
+/finetune/data/
+/finetune/out/
+*.gguf
+__pycache__/
+*.pyc

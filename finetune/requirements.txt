@@ -1,0 +1,11 @@
+# QLoRA 情绪评分微调依赖（Python 3.10+，CUDA GPU）
+# 安装：pip install -r requirements.txt
+# Windows 若 bitsandbytes 报错，升级到 >=0.43（已带 Windows wheel），或改用 WSL2。
+torch>=2.1            # 按你的 CUDA 版本装对应 wheel（见 https://pytorch.org）
+transformers>=4.44
+peft>=0.12
+bitsandbytes>=0.43
+trl>=0.9
+accelerate>=0.33
+datasets>=2.20
+scikit-learn>=1.3

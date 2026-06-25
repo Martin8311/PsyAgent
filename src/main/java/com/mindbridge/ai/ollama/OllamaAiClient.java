@@ -48,7 +48,25 @@ public class OllamaAiClient implements AiClient {
 
     @Override
     public Flux<String> streamChat(List<ChatMessage> messages, LlmCallMeta meta) {
-        OllamaDtos.ChatRequest body = new OllamaDtos.ChatRequest(config.getModel(), messages, true,
+        return streamChat(messages, meta, null);
+    }
+
+    @Override
+    public Mono<String> chat(List<ChatMessage> messages, LlmCallMeta meta) {
+        return chat(messages, meta, null);
+    }
+
+    @Override
+    public Mono<String> chat(List<ChatMessage> messages, LlmCallMeta meta, String model) {
+        return streamChat(messages, meta, model)
+                .collect(StringBuilder::new, StringBuilder::append)
+                .map(StringBuilder::toString);
+    }
+
+    /** 流式对话，model 为空时回退到默认模型。 */
+    public Flux<String> streamChat(List<ChatMessage> messages, LlmCallMeta meta, String model) {
+        String useModel = (model == null || model.isBlank()) ? config.getModel() : model;
+        OllamaDtos.ChatRequest body = new OllamaDtos.ChatRequest(useModel, messages, true,
                 new OllamaDtos.ChatRequest.Options(config.getNumCtx()));
         return webClient.post()
                 .uri("/api/chat")
@@ -60,7 +78,7 @@ public class OllamaAiClient implements AiClient {
                 .takeUntil(OllamaDtos.ChatChunk::done)
                 .doOnNext(chunk -> {
                     if (chunk.done()) {
-                        reportUsage(meta, chunk);
+                        reportUsage(meta, chunk, useModel);
                     }
                 })
                 .map(OllamaDtos.ChatChunk::text)
@@ -68,20 +86,13 @@ public class OllamaAiClient implements AiClient {
                 .doOnError(e -> log.error("Ollama streamChat error: {}", e.getMessage()));
     }
 
-    @Override
-    public Mono<String> chat(List<ChatMessage> messages, LlmCallMeta meta) {
-        return streamChat(messages, meta).collect(StringBuilder::new, StringBuilder::append)
-                .map(StringBuilder::toString);
-    }
-
     /** 从 done 块读取真实 token 计数并归因记录(prompt_eval_count / eval_count)。 */
-    private void reportUsage(LlmCallMeta meta, OllamaDtos.ChatChunk chunk) {
+    private void reportUsage(LlmCallMeta meta, OllamaDtos.ChatChunk chunk, String model) {
         Integer p = chunk.promptEvalCount();
         Integer c = chunk.evalCount();
         if (p == null && c == null) {
             return;
         }
-        tokenUsageService.record(meta, config.getModel(),
-                p == null ? 0 : p, c == null ? 0 : c);
+        tokenUsageService.record(meta, model, p == null ? 0 : p, c == null ? 0 : c);
     }
 }

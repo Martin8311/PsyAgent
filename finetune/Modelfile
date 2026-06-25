@@ -1,0 +1,12 @@
+# Ollama 部署模板：把微调后的 GGUF 导入为 mindbridge-emotion
+# 用法(在含 gguf 的目录)：ollama create mindbridge-emotion -f Modelfile
+# 路径改成你 quantize 出来的 gguf 文件名。
+
+FROM ./mindbridge-emotion-q4_k_m.gguf
+
+# 情绪评分要确定性输出，温度压低
+PARAMETER temperature 0.1
+PARAMETER top_p 0.9
+PARAMETER num_ctx 4096
+
+# system 不在此固定——运行时由 RiskAssessmentService 注入，保持与训练一致

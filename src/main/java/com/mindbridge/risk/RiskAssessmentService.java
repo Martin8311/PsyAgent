@@ -3,7 +3,9 @@ package com.mindbridge.risk;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mindbridge.ai.AiClient;
+import com.mindbridge.ai.AiProperties;
 import com.mindbridge.ai.ChatMessage;
+import com.mindbridge.ai.LlmCallMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -45,10 +47,12 @@ public class RiskAssessmentService {
 
     private final AiClient aiClient;
     private final ObjectMapper objectMapper;
+    private final String emotionModel;
 
-    public RiskAssessmentService(AiClient aiClient, ObjectMapper objectMapper) {
+    public RiskAssessmentService(AiClient aiClient, ObjectMapper objectMapper, AiProperties aiProperties) {
         this.aiClient = aiClient;
         this.objectMapper = objectMapper;
+        this.emotionModel = aiProperties.getOllama().getEmotionModel();
     }
 
     /**
@@ -88,7 +92,9 @@ public class RiskAssessmentService {
                 ChatMessage.system(sys),
                 ChatMessage.user("学生的话：「" + text + "」")
         );
-        return aiClient.chat(messages).map(this::parse);
+        // 走情绪评估专用模型(QLoRA 微调)；emotionModel 为空时自动回退默认模型
+        return aiClient.chat(messages, LlmCallMeta.of(LlmCallMeta.Purpose.RISK_ASSESS), emotionModel)
+                .map(this::parse);
     }
 
     /** 从模型输出里提取 JSON 并解析为 RiskAssessment。 */

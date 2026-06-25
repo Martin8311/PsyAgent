@@ -1,0 +1,91 @@
+# MindBridge 一键编排：app + MySQL + Redis + RabbitMQ + Chroma。
+# 注意：Ollama 需要本机/GPU，跑在宿主机上(端口 11434)，容器通过 host.docker.internal 访问。
+# 用法：复制 .env.example 为 .env 填好密钥，然后 `docker compose up -d`。
+services:
+  app:
+    build: .
+    # 也可直接用 CI 推到 GHCR 的镜像：image: ghcr.io/martin8311/psyagent:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      chroma:
+        condition: service_started
+    restart: on-failure
+    environment:
+      # —— MySQL（容器内用服务名 mysql）——
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/mindbridge?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # —— Redis ——
+      SPRING_DATA_REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # —— RabbitMQ ——
+      SPRING_RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # —— Ollama 在宿主机（需 GPU）——
+      MINDBRIDGE_AI_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      SPRING_AI_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      # —— Chroma 向量库 ——
+      SPRING_AI_VECTORSTORE_CHROMA_CLIENT_HOST: chroma
+      SPRING_AI_VECTORSTORE_CHROMA_CLIENT_PORT: "8000"
+      # —— 邮件（可留空，不影响启动）——
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      ADMIN_MAIL: ${ADMIN_MAIL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux 下让容器能访问宿主机 Ollama
+
+  mysql:
+    image: mysql:8.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: mindbridge
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_DEFAULT_VHOST: mindbridge
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+volumes:
+  mysql_data:
+  chroma_data:

@@ -37,4 +37,12 @@ public interface AiClient {
     default Mono<String> chat(List<ChatMessage> messages) {
         return chat(messages, LlmCallMeta.UNKNOWN);
     }
+
+    /**
+     * 阻塞式对话，可指定模型(如情绪评估专用微调模型)。
+     * model 为空时回退到默认模型。非 Ollama 实现可忽略 model。
+     */
+    default Mono<String> chat(List<ChatMessage> messages, LlmCallMeta meta, String model) {
+        return chat(messages, meta);
+    }
 }

@@ -791,6 +791,7 @@
                     : (q.source==='MANUAL' ? '<span class="emo" style="font-size:11px">✍ 手工</span>'
                     : '<span class="emo" style="font-size:11px">📄 事实</span>');
                 rows+='<tr>'
+                    +'<td><input type="checkbox" class="eval-chk" value="'+q.id+'"></td>'
                     +'<td class="msg-cell">'+esc(q.query)+'<br>'+src+'</td>'
                     +'<td class="emo">#'+q.expectedDocId+' '+esc(q.expectedTitle)+'</td>'
                     +'<td>'+st+'</td>'
@@ -799,8 +800,15 @@
                     +'<button class="btn-del" onclick="delEval('+q.id+')"><span class="ic" data-i="trash"></span>删</button>'
                     +'</td></tr>';
             }
-            body.innerHTML='<div class="emo" style="margin-bottom:8px">共 '+list.length+' 条，已确认 '+reviewed+' 条（只有已确认的参与评测）</div>'
-                +'<table><thead><tr><th>问题</th><th>期望文档</th><th>状态</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
+            body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">'
+                +'<span class="emo">共 '+list.length+' 条，已确认 '+reviewed+' 条（只有已确认的参与评测）</span>'
+                +'<span style="display:flex;gap:8px">'
+                +'<button class="btn-notify" onclick="batchConfirmEval()">批量确认选中</button>'
+                +'<button class="btn-del" onclick="batchDeleteEval()"><span class="ic" data-i="trash"></span>批量删除选中</button>'
+                +'</span></div>'
+                +'<table><thead><tr>'
+                +'<th style="width:34px"><input type="checkbox" onclick="toggleAllEval(this)" title="全选/取消"></th>'
+                +'<th>问题</th><th>期望文档</th><th>状态</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
             paintIcons();
         }
         async function confirmEval(id){
@@ -821,6 +829,35 @@
                 if(r.ok){ const d=await r.json(); msg.className='kb-msg ok'; msg.textContent='✓ 已清空 '+d.deleted+' 条待校正样例'; loadEvalQueries(); }
                 else{ msg.className='kb-msg err'; msg.textContent='清空失败（'+r.status+'）'; }
             }catch(e){ msg.className='kb-msg err'; msg.textContent='网络错误：'+e.message; }
+        }
+        function toggleAllEval(master){
+            document.querySelectorAll('.eval-chk').forEach(c=>c.checked=master.checked);
+        }
+        function checkedEvalIds(){
+            return Array.from(document.querySelectorAll('.eval-chk:checked')).map(c=>Number(c.value));
+        }
+        function showEvalMsg(text, cls){
+            const msg=document.getElementById('evalMsg');
+            msg.classList.remove('hidden'); msg.className='kb-msg '+(cls||'ok'); msg.textContent=text;
+        }
+        async function batchConfirmEval(){
+            const ids=checkedEvalIds();
+            if(!ids.length){ alert('请先勾选要确认的样例'); return; }
+            try{
+                const r=await fetch('/api/admin/eval/queries/batch-confirm',{ method:'POST', headers:jsonHeader(), body:JSON.stringify({ids}) });
+                if(r.ok){ const d=await r.json(); showEvalMsg('✓ 已确认 '+d.confirmed+' 条','ok'); loadEvalQueries(); }
+                else showEvalMsg('批量确认失败（'+r.status+'）','err');
+            }catch(e){ showEvalMsg('网络错误：'+e.message,'err'); }
+        }
+        async function batchDeleteEval(){
+            const ids=checkedEvalIds();
+            if(!ids.length){ alert('请先勾选要删除的样例'); return; }
+            if(!confirm('删除选中的 '+ids.length+' 条评测样例？')) return;
+            try{
+                const r=await fetch('/api/admin/eval/queries/batch-delete',{ method:'POST', headers:jsonHeader(), body:JSON.stringify({ids}) });
+                if(r.ok){ const d=await r.json(); showEvalMsg('✓ 已删除 '+d.deleted+' 条','ok'); loadEvalQueries(); }
+                else showEvalMsg('批量删除失败（'+r.status+'）','err');
+            }catch(e){ showEvalMsg('网络错误：'+e.message,'err'); }
         }
         async function genEval(){
             const perDoc=document.getElementById('perDoc').value||3;

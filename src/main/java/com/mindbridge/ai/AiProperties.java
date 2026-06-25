@@ -35,9 +35,19 @@ public class AiProperties {
         private int timeoutSeconds = 120;
         /** 上下文窗口大小(token)。Ollama 默认仅 2048，prompt 易被静默截断，显式调大。 */
         private int numCtx = 8192;
+        /** 情绪/风险评估专用模型(QLoRA 微调)。留空则回退到 model，部署前后零改动。 */
+        private String emotionModel = "";
 
         public String getBaseUrl() {
             return baseUrl;
+        }
+
+        public String getEmotionModel() {
+            return emotionModel;
+        }
+
+        public void setEmotionModel(String emotionModel) {
+            this.emotionModel = emotionModel;
         }
 
         public int getNumCtx() {
